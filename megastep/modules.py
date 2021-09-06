@@ -204,6 +204,49 @@ def downsample(screen, subsample):
     or ``[..., 0]``.
     """
     return screen.view(*screen.shape[:-1], screen.shape[-1]//subsample, subsample)
+class Laser:
+
+    def __init__(self, core, n_agents=None, subsample=1, max_depth=10):
+        """Generates 2D laser scanner observations.
+
+        :param core: The :class:`~megastep.core.Core` used by the environment.
+        :param n_agents: The number of agents to generate observations for. This is usually taken from the core; it can
+            be usefully overridden in :ref:`multiagent environments <deathmatch-env>`.
+        :param subsample: How many horizontal rays to average when generating the observations. For example, if the
+            core is rendering at 256 rays and ``subsample`` is 4, then 64-ray observations will be returned.
+            A higher subsampling rate makes for slower rendering, but smoother observations.
+        :param max_depth: The maximum depth, corresponding to a -1 in the observation. Given in meters.
+
+        :var space: The :ref:`observation space <spaces>` to present to the controlling network.
+        :var max_depth: The value of the ``max_depth`` parameter.
+        :var subsample: The value of the ``subsample`` parameter.
+        """
+        n_agents = n_agents or core.n_agents
+        self.core = core
+        self.space = spaces.MultiVector(n_agents, core.res // subsample)
+        self.max_depth = max_depth
+        self.subsample = subsample
+
+    def __call__(self, r=None):
+        """Generates a depth observation.
+
+        This means calling :func:`~megastep.cuda.render` (if ``r`` isn't passed), then using it to create and return a
+        range tensor of values between 0 and max_depth. The values interpolate linearly between 0 at the near clipping
+        plane (given by :attr:`megastep.core.AGENT_RADIUS`) and ``max_depth``.
+
+        :param r: The output of :func:`render`. :func:`render` will be called if this isn't passed.
+            It's useful to pass ``r`` if you're doing other things with the render output.
+        :return: A (n_env, n_agent, 1, res)-tensor of values between 0 and ``max_depth`.
+        """
+        r = render(self.core) if r is None else r
+        ranges = (r.distances - self.core.agent_radius).clamp(0, self.max_depth)
+        self._last_obs = downsample(ranges, self.subsample).mean(-1).squeeze(-2)
+        return self._last_obs
+
+    def state(self, e=0):
+        """The state of the module in sub-env ``e``, which is to say its last observation for ``e``. Useful in
+        :ref:`plotting <plotting>`"""
+        return self._last_obs[e].clone()
 
 class Depth:
 
