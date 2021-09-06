@@ -127,7 +127,7 @@ class Core:
         from . import plotting
         ax = ax or plt.axes()
         plotting.plot_lines(ax, state, zoom=zoom)
-        plotting.plot_lights(ax,state)
+        plotting.plot_lights(ax, state)
         plotting.adjust_view(ax, state, zoom=zoom)
         plotting.plot_fov(ax, state)
         ax.set_xticks([])

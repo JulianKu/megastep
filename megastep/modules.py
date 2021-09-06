@@ -1,5 +1,5 @@
 """:mod:`megastep.modules` are chunks of functionality that often turn up in megastep environments. 
-""" 
+"""
 
 import numpy as np
 import torch
@@ -7,19 +7,22 @@ from rebar import arrdict
 from . import spaces, geometry, cuda, plotting
 import matplotlib.pyplot as plt
 
+
 def to_local_frame(angles, p):
     """Converts a velocity vector in the global coordinate frame to one in the frame local to the agent"""
-    a = np.pi/180*angles
+    a = np.pi / 180 * angles
     c, s = torch.cos(a), torch.sin(a)
     x, y = p[..., 0], p[..., 1]
-    return torch.stack([c*x + s*y, -s*x + c*y], -1)
+    return torch.stack([c * x + s * y, -s * x + c * y], -1)
+
 
 def to_global_frame(angles, p):
     """Converts a velocity vector in the local coordinate frame of the agent to one in the global frame."""
-    a = np.pi/180*angles
+    a = np.pi / 180 * angles
     c, s = torch.cos(a), torch.sin(a)
     x, y = p[..., 0], p[..., 1]
-    return torch.stack([c*x - s*y, s*x + c*y], -1)
+    return torch.stack([c * x - s * y, s * x + c * y], -1)
+
 
 class SimpleMovement:
 
@@ -42,11 +45,11 @@ class SimpleMovement:
         """
         # noop, forward/backward, strafe left/right, turn left/right
         self.core = core
-        velocity = torch.tensor([[0., 0.], [0., 1.], [0.,-1.], [1., 0.], [-1.,0.], [0., 0.], [0., 0.]])
+        velocity = torch.tensor([[0., 0.], [0., 1.], [0., -1.], [1., 0.], [-1., 0.], [0., 0.], [0., 0.]])
         angvelocity = torch.tensor([0., 0., 0., 0., 0., +1., -1.])
         self._actionset = arrdict.arrdict(
-            velocity=speed/core.fps*velocity,
-            angvelocity=ang_speed/core.fps*angvelocity
+            velocity=speed / core.fps * velocity,
+            angvelocity=ang_speed / core.fps * angvelocity
         ).to(core.device)
 
         self.space = spaces.MultiDiscrete(n_agents or core.n_agents, 7)
@@ -64,6 +67,7 @@ class SimpleMovement:
         core.agents.angvelocity[:] = delta.angvelocity
         core.agents.velocity[:] = to_global_frame(core.agents.angles, delta.velocity)
         return cuda.physics(core.scenery, core.agents)
+
 
 class MomentumMovement:
 
@@ -92,11 +96,11 @@ class MomentumMovement:
 
         # noop, forward/backward, strafe left/right, turn left/right
         self.core = core
-        velocity = torch.tensor([[0., 0.], [0., 1.], [0.,-1.], [1., 0.], [-1.,0.], [0., 0.], [0., 0.]])
+        velocity = torch.tensor([[0., 0.], [0., 1.], [0., -1.], [1., 0.], [-1., 0.], [0., 0.], [0., 0.]])
         angvelocity = torch.tensor([0., 0., 0., 0., 0., +1., -1.])
         self._actionset = arrdict.arrdict(
-            velocity=accel/core.fps*velocity,
-            angvelocity=ang_accel/core.fps*angvelocity
+            velocity=accel / core.fps * velocity,
+            angvelocity=ang_accel / core.fps * angvelocity
         ).to(core.device)
 
         self.decay = decay
@@ -113,8 +117,9 @@ class MomentumMovement:
         """
         core = self.core
         delta = self._actionset[decision.actions.long()]
-        core.agents.angvelocity[:] = (1 - self.decay)*core.agents.angvelocity + delta.angvelocity
-        core.agents.velocity[:] = (1 - self.decay)*core.agents.velocity + to_global_frame(core.agents.angles, delta.velocity)
+        core.agents.angvelocity[:] = (1 - self.decay) * core.agents.angvelocity + delta.angvelocity
+        core.agents.velocity[:] = (1 - self.decay) * core.agents.velocity \
+                                  + to_global_frame(core.agents.angles, delta.velocity)
         return cuda.physics(core.scenery, core.agents)
 
 
@@ -178,11 +183,13 @@ class MomentumMovementOnOff:
                                    to_global_frame(core.agents.angles, delta.velocity))
         return cuda.physics(core.scenery, core.agents)
 
+
 def unpack(d):
     """Unpacks :mod:`~megastep.cuda` datastructures into :ref:`arrdicts <dotdicts>` with the same attributes."""
     if isinstance(d, torch.Tensor):
         return d
     return arrdict.arrdict({k: unpack(getattr(d, k)) for k in dir(d) if not k.startswith('_')})
+
 
 def render(core):
     """Calls :func:`~megastep.cuda.render`, turns the output into an :ref:`attrdict <dotdicts>`, 
@@ -196,6 +203,7 @@ def render(core):
     render['screen'] = render.screen.permute(0, 1, 4, 2, 3)
     return render
 
+
 def downsample(screen, subsample):
     """Factors a :func:`render`'d screen tensor along its final width dimension, returning something with shape
     (..., width/subsample, subsample). 
@@ -203,7 +211,7 @@ def downsample(screen, subsample):
     Typically you chase this call by aggregating over the trailing dimension in some way; either mean or min or max
     or ``[..., 0]``.
     """
-    return screen.view(*screen.shape[:-1], screen.shape[-1]//subsample, subsample)
+    return screen.view(*screen.shape[:-1], screen.shape[-1] // subsample, subsample)
 
 
 class BatteryLevel:
@@ -258,6 +266,7 @@ class BatteryLevel:
         :ref:`plotting <plotting>`"""
         return self._battery_level[e].clone()
 
+
 class Laser:
 
     def __init__(self, core, n_agents=None, subsample=1, max_depth=10):
@@ -302,14 +311,15 @@ class Laser:
         :ref:`plotting <plotting>`"""
         return self._last_obs[e].clone()
 
+
 class Depth:
 
     def __init__(self, core, n_agents=None, subsample=1, max_depth=10):
         """Generates depth observations.
         
         :param core: The :class:`~megastep.core.Core` used by the environment.
-        :param n_agents: The number of agents to generate observations for. This is usually taken from the core; it can be usefully
-            overridden in :ref:`multiagent environments <deathmatch-env>`.
+        :param n_agents: The number of agents to generate observations for. This is usually taken from the core; it can
+            be usefully overridden in :ref:`multiagent environments <deathmatch-env>`.
         :param subsample: How many horizontal pixels to average when generating the observations. For example, if the 
             core is rendering at 256 pixels and ``subsample`` is 4, then 64-pixel observations will be returned. 
             A higher subsampling rate makes for slower rendering, but smoother observations. 
@@ -321,7 +331,7 @@ class Depth:
         """
         n_agents = n_agents or core.n_agents
         self.core = core
-        self.space = spaces.MultiImage(n_agents, 1, 1, core.res//subsample)
+        self.space = spaces.MultiImage(n_agents, 1, 1, core.res // subsample)
         self.max_depth = max_depth
         self.subsample = subsample
 
@@ -337,14 +347,15 @@ class Depth:
         :return: A (n_env, n_agent, 1, res)-tensor of values between 0 and 1.
         """
         r = render(self.core) if r is None else r
-        depth = 1 - ((r.distances - self.core.agent_radius)/self.max_depth).clamp(0, 1)
+        depth = 1 - ((r.distances - self.core.agent_radius) / self.max_depth).clamp(0, 1)
         self._last_obs = downsample(depth, self.subsample).mean(-1).unsqueeze(3)
         return self._last_obs
-    
+
     def state(self, e=0):
         """The state of the module in sub-env ``e``, which is to say its last observation for ``e``. Useful in
         :ref:`plotting <plotting>`"""
         return self._last_obs[e].clone()
+
 
 class RGB:
 
@@ -352,8 +363,8 @@ class RGB:
         """Generates RGB observations.
         
         :param core: The :class:`~megastep.core.Core` used by the environment.
-        :param n_agents: The number of agents to generate observations for. This is usually taken from the core; it can be usefully
-            overridden in :ref:`multiagent environments <deathmatch-env>`.
+        :param n_agents: The number of agents to generate observations for. This is usually taken from the core; it can
+            be usefully overridden in :ref:`multiagent environments <deathmatch-env>`.
         :param subsample: How many horizontal pixels to average when generating the observations. For example, if the 
             core is rendering at 256 pixels and ``subsample`` is 4, then 64-pixel observations will be returned. 
             A higher subsampling rate makes for slower rendering, but smoother observations. 
@@ -363,7 +374,7 @@ class RGB:
         """
         n_agents = n_agents or core.n_agents
         self.core = core
-        self.space = spaces.MultiImage(n_agents, 3, 1, core.res//subsample)
+        self.space = spaces.MultiImage(n_agents, 3, 1, core.res // subsample)
         self.subsample = subsample
 
     def __call__(self, r=None):
@@ -380,7 +391,7 @@ class RGB:
         r = render(self.core) if r is None else r
         self._last_obs = downsample(r.screen, self.subsample).mean(-1)
         return self._last_obs
-    
+
     def state(self, e=0):
         """The state of the module in sub-env ``e``, which is to say its last observation for ``e``. Useful in
         :ref:`plotting <plotting>`"""
@@ -395,15 +406,16 @@ class RGB:
         plotting.plot_images({'rgb': state}, axes)
         return axes
 
+
 class IMU:
 
-    def __init__(self, core, speed_scale=10., ang_scale=360., n_agents=None,):
+    def __init__(self, core, speed_scale=10., ang_scale=360., n_agents=None, ):
         """Generate a linear-and-angular-velocity measurement. Kinda like a `inertial measurement unit
         <https://en.wikipedia.org/wiki/Inertial_measurement_unit>`_.
 
         :param core: The :class:`~megastep.core.Core` used by the environment.
-        :param n_agents: The number of agents to generate observations for. This is usually taken from the core; it can be usefully
-            overridden in :ref:`multiagent environments <deathmatch-env>`.
+        :param n_agents: The number of agents to generate observations for. This is usually taken from the core; it can
+            be usefully overridden in :ref:`multiagent environments <deathmatch-env>`.
         :param speed_scale: The scale of speeds to use, with this value corresponding to an observation of 1. Given
             in meters per second.
         :param ang_scale: The scale of angular speeds to use, with this value corresponding to an observation of 1.
@@ -422,10 +434,11 @@ class IMU:
         """Returns an IMU observation, which is to say a (n_env, n_agent, 3)-float tensor. The values along the final
         dimension are (angular_velocity, medial_velocity, lateral_velocity), with the ``angular_velocity`` scaled by 
         ``ang_scale`` and the linear velocities scaled by ``speed_scale``. 
-        """ 
+        """
         return torch.cat([
-            self.core.agents.angvelocity[..., None]/self.ang_scale,
-            to_local_frame(self.core.agents.angles, self.core.agents.velocity)/self.speed_scale], -1)
+            self.core.agents.angvelocity[..., None] / self.ang_scale,
+            to_local_frame(self.core.agents.angles, self.core.agents.velocity) / self.speed_scale], -1)
+
 
 def random_empty_positions(geometries, n_agents, n_points, rng=np.random.default_rng()):
     """Returns a tensor of randomly-selected empty points in each :ref:`geometry <geometry>`.
@@ -435,21 +448,22 @@ def random_empty_positions(geometries, n_agents, n_points, rng=np.random.default
     This is typcially used when you want to randomly move an agent to a new place, but *finding* an empty point at 
     each timestep is too expensive. So instead this is used to generate ``n_points`` empty points in advance, and then
     when you need one you can choose from the pre-generated options.
-    """ 
+    """
     points = []
     for g in geometries:
         sample = np.stack((g.masks > 0).nonzero(), -1)
 
         # There might be fewer open points than we're asking for
-        n_possible = min(len(sample)//n_agents, n_points)
+        n_possible = min(len(sample) // n_agents, n_points)
         sample = sample[rng.choice(np.arange(len(sample)), (n_possible, n_agents), replace=True)]
 
         # So repeat the sample until we've got enough
-        sample = np.concatenate([sample]*int(n_points/len(sample)+1))[-n_points:]
+        sample = np.concatenate([sample] * int(n_points / len(sample) + 1))[-n_points:]
         sample = rng.permutation(sample)
         points.append(geometry.centers(sample, g.masks.shape, g.res).transpose(1, 0, 2))
     return arrdict.stack(points)
-        
+
+
 class RandomSpawns:
 
     def __init__(self, geometries, core, n_spawns=100):
@@ -478,10 +492,12 @@ class RandomSpawns:
         core = self.core
         required = reset.nonzero(as_tuple=True)
         choices = torch.randint_like(required[0], 0, self._spawns.angles.shape[1])
-        core.agents.angles[required] = self._spawns.angles[(*required, choices)] 
-        core.agents.positions[required] = self._spawns.positions[(*required, choices)] 
+        core.agents.angles[required] = self._spawns.angles[(*required, choices)]
+        core.agents.positions[required] = self._spawns.positions[(*required, choices)]
         core.agents.velocity[required] = 0.
         core.agents.angvelocity[required] = 0.
+        core.agents.motionstate[required] = 0.
+
 
 class RandomLifespans:
 
@@ -505,7 +521,7 @@ class RandomLifespans:
 
         TODO: Test this now you've rewritten it.
         """
-        min_lifespan = max_lifespan//2 if min_lifespan is None else min_lifespan
+        min_lifespan = max_lifespan // 2 if min_lifespan is None else min_lifespan
         self.min_lifespan = min_lifespan
         self.max_lifespan = max_lifespan
         self._max_lifespans = torch.zeros((core.n_envs, core.n_agents), dtype=torch.int, device=core.device)
