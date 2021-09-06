@@ -1,3 +1,4 @@
+recordings
 .vscode
 output
 __pycache__
@@ -13,3 +14,4 @@ build
 dist
 .env
 .cubicasa-confirmed
+.idea
