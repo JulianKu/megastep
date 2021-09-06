@@ -101,8 +101,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ragged<Ragged<float, 3>>(m, "Ragged3D");
 
     py::class_<Agents>(m, "Agents", py::module_local())
-        .def(py::init<TT, TT, TT, TT>(),
-            "angles"_a, "positions"_a, "angvelocity"_a, "velocity"_a, R"pbdoc( 
+        .def(py::init<TT, TT, TT, TT, TT>(),
+            "angles"_a, "positions"_a, "angvelocity"_a, "velocity"_a, "motionstate"_a, R"pbdoc(
                 Holds the state of the agents. Typically accessed through :attr:`~megastep.core.Core.agents`.
             
                 See the :ref:`agents <agents>` section for a discussion of this class's place in megastep.
@@ -117,7 +117,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .def_property_readonly("angvelocity", [](Agents a) { return a.angvelocity.t; }, R"pbdoc(
             An (n_env, n_agent)-tensor of agents' angular velocity, in degrees per second.)pbdoc")
         .def_property_readonly("velocity", [](Agents a) { return a.velocity.t; }, R"pbdoc( 
-            An (n_env, n_agent, 2)-tensor of agents' velocity, in meters per second.)pbdoc");
+            An (n_env, n_agent, 2)-tensor of agents' velocity, in meters per second.)pbdoc")
+        .def_property_readonly("motionstate", [](Agents a) { return a.motionstate.t; }, R"pbdoc(
+            An (n_env, n_agent)-tensor of agents' motion state (0: turned off, 1: turned on).)pbdoc");
 
     py::class_<Scenery>(m, "Scenery", py::module_local()) 
         .def(py::init<int, Lights, Lines, Textures, TT>(),

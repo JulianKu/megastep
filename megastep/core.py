@@ -27,7 +27,8 @@ def _init_agents(n_envs, n_agents, device='cuda'):
             angles=torch.zeros((n_envs, n_agents)),
             positions=torch.zeros((n_envs, n_agents, 2)),
             angvelocity=torch.zeros((n_envs, n_agents)),
-            velocity=torch.zeros((n_envs, n_agents, 2)))
+            velocity=torch.zeros((n_envs, n_agents, 2)),
+            motionstate=torch.zeros((n_envs, n_agents)))
     return cuda.Agents(**data.to(device))
 
 class Core: 

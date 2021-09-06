@@ -158,12 +158,14 @@ using Angles = TensorProxy<float, 2>;
 using Positions = TensorProxy<float, 3>;
 using AngVelocity = TensorProxy<float, 2>;
 using Velocity = TensorProxy<float, 3>;
+using MotionState = TensorProxy<float, 2>;
 
 struct Agents {
     Angles angles;
     Positions positions; 
     AngVelocity angvelocity;
-    Velocity velocity; 
+    Velocity velocity;
+    MotionState motionstate;
 
     py::object state(const size_t e) {
         const auto arrdict = py::module::import("rebar.arrdict").attr("arrdict");
@@ -171,7 +173,8 @@ struct Agents {
             "angles"_a=angles.t[e],
             "positions"_a=positions.t[e],
             "angvelocity"_a=angvelocity.t[e],
-            "velocity"_a=velocity.t[e]);
+            "velocity"_a=velocity.t[e],
+            "motionstate"_a=motionstate.t[e]);
     }
 
 };
