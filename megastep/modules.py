@@ -204,6 +204,60 @@ def downsample(screen, subsample):
     or ``[..., 0]``.
     """
     return screen.view(*screen.shape[:-1], screen.shape[-1]//subsample, subsample)
+
+
+class BatteryLevel:
+
+    def __init__(self, core, n_agents=None, scale_factor=0.1, lin_ang_factor=0.5, const_discharge=0.1):
+        """Generates battery level observations.
+
+        :param core: The :class:`~megastep.core.Core` used by the environment.
+        :param n_agents: The number of agents to generate observations for. This is usually taken from the core; it can
+            be usefully overridden in :ref:`multiagent environments <deathmatch-env>`.
+        :param scale_factor: linear scaling factor for the whole discharge term, with which the battery level decreases
+            each step
+        :param lin_ang_factor: blending factor between influence of linear and angular velocity on the discharge of the
+            battery
+        :param const_discharge: constant discharge term that decreases battery level on top of velocity discharge (also
+            scaled by ``scale_factor``)
+
+        :var space: The :ref:`observation space <spaces>` to present to the controlling network.
+        """
+        n_agents = n_agents or core.n_agents
+        self.core = core
+        self.space = spaces.MultiConstant(n_agents)
+        self._scale_factor = scale_factor
+        self._lin_ang_factor = lin_ang_factor
+        self._const_discharge = const_discharge
+        self._battery_level = torch.ones_like(self.core.progress).to(self.core.device)
+
+    def __call__(self, r=None):
+        """Generates a battery level observation.
+
+        This means calling :func:`~megastep.cuda.render` (if ``r`` isn't passed), then using updated agent velocities
+        to create and return a battery level tensor of values between 0 and 1. The values interpolate linearly between
+        one at full capacity and zero at empty battery level.
+
+        :param r: The output of :func:`render`. :func:`render` will be called if this isn't passed.
+            It's useful to pass ``r`` if you're doing other things with the render output.
+        :return: A (n_env, n_agent)-tensor of values between 0 and 1.
+        """
+        if r is None:
+            render(self.core)
+        lin_vel_magnitude = self.core.agents.velocity.norm(dim=-1)
+        lin_ang_factor = self._lin_ang_factor
+        self._battery_level -= self._scale_factor * (self.core.agents.motionstate *
+                                                     (lin_ang_factor * lin_vel_magnitude
+                                                      + (1 - lin_ang_factor) * self.core.agents.angvelocity)
+                                                     + self._const_discharge)
+
+        return self._battery_level
+
+    def state(self, e=0):
+        """The state of the module in sub-env ``e``, which is to say its last observation for ``e``. Useful in
+        :ref:`plotting <plotting>`"""
+        return self._battery_level[e].clone()
+
 class Laser:
 
     def __init__(self, core, n_agents=None, subsample=1, max_depth=10):
