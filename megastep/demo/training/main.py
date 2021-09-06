@@ -1,7 +1,7 @@
 from datetime import datetime
+from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
 import torch
 from tqdm.auto import tqdm
 
@@ -13,10 +13,11 @@ SAVE_DIR = "recordings"
 if __name__ == '__main__':
     seed = 10
     n_envs = 5
-    n_agents = 3
+    n_agents = 1
+    n_search_objects = 4
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
-    env = SearchAndRescueBase(n_envs, n_agents=n_agents, rng=rng)
+    env = SearchAndRescueBase(n_envs, n_agents, n_search_objects, rng=rng)
 
     # number of processes to use for encoding. None -> 1/2 of CPUs
     N = None
@@ -40,10 +41,10 @@ if __name__ == '__main__':
                 break
             state = env.state(d)
 
-            fig = env.display(0)
-            # plt.show()
+            fig = env.display(0, n_agents)
+            plt.show()
 
-            encoder(arrdict.numpyify(arrdict.arrdict(**state, decision=decision)))
+            encoder(arrdict.numpyify(arrdict.arrdict(**state, decision=decision)), n_agents)
             if steps == length:
                 break
 

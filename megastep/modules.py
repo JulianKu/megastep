@@ -62,10 +62,11 @@ class SimpleMovement:
         :param decision: A :ref:`decision <decision-world>` dict with an ``action`` key conforming to ``.space``.
         :return: The result of the :func:`~megastep.cuda.physics` call.
         """
+        n_agents = self.space.shape[0]
         core = self.core
         delta = self._actionset[decision.actions.long()]
-        core.agents.angvelocity[:] = delta.angvelocity
-        core.agents.velocity[:] = to_global_frame(core.agents.angles, delta.velocity)
+        core.agents.angvelocity[:, :n_agents] = delta.angvelocity
+        core.agents.velocity[:, :n_agents] = to_global_frame(core.agents.angles[:, :n_agents], delta.velocity)
         return cuda.physics(core.scenery, core.agents)
 
 
@@ -115,11 +116,12 @@ class MomentumMovement:
         :param decision: A :ref:`decision <decision-world>` dict with an ``actions`` key conforming to ``.space``.
         :return: The result of the :func:`~megastep.cuda.physics` call.
         """
+        n_agents = self.space.shape[0]
         core = self.core
         delta = self._actionset[decision.actions.long()]
-        core.agents.angvelocity[:] = (1 - self.decay) * core.agents.angvelocity + delta.angvelocity
-        core.agents.velocity[:] = (1 - self.decay) * core.agents.velocity \
-                                  + to_global_frame(core.agents.angles, delta.velocity)
+        core.agents.angvelocity[:, :n_agents] = (1 - self.decay) * core.agents.angvelocity[:, :n_agents] + delta.angvelocity
+        core.agents.velocity[:, :n_agents] = (1 - self.decay) * core.agents.velocity[:, :n_agents] + \
+                                          to_global_frame(core.agents.angles[:, :n_agents], delta.velocity)
         return cuda.physics(core.scenery, core.agents)
 
 
@@ -173,14 +175,16 @@ class MomentumMovementOnOff:
         :param decision: A :ref:`decision <decision-world>` dict with an ``actions`` key conforming to ``.space``.
         :return: The result of the :func:`~megastep.cuda.physics` call.
         """
+        n_agents = self.space.shape[0]
         core = self.core
         delta = self._actionset[decision.actions.long()]
-        core.agents.motionstate.masked_fill_(delta.onoff < 0, 0.).masked_fill_(delta.onoff > 0, 1.)
-        core.agents.angvelocity[:] = core.agents.motionstate * ((1 - self.decay) * core.agents.angvelocity
-                                                                + delta.angvelocity)
-        core.agents.velocity[:] = core.agents.motionstate.unsqueeze(-1) * \
-                                  ((1 - self.decay) * core.agents.velocity +
-                                   to_global_frame(core.agents.angles, delta.velocity))
+        core.agents.motionstate[:, :n_agents].masked_fill_(delta.onoff < 0, 0.).masked_fill_(delta.onoff > 0, 1.)
+        core.agents.angvelocity[:, :n_agents] = core.agents.motionstate[:, :n_agents] * \
+                                             ((1 - self.decay) * core.agents.angvelocity[:, :n_agents] +
+                                              delta.angvelocity[:, :n_agents])
+        core.agents.velocity[:, :n_agents] = core.agents.motionstate[:, :n_agents].unsqueeze(-1) * \
+                                          ((1 - self.decay) * core.agents.velocity[:, :n_agents] +
+                                           to_global_frame(core.agents.angles[:, :n_agents], delta.velocity))
         return cuda.physics(core.scenery, core.agents)
 
 

@@ -11,14 +11,17 @@ CLEARANCE = 1.
 
 class SearchAndRescueBase:
 
-    def __init__(self, n_envs, *args, **kwargs):
+    def __init__(self, n_envs, n_agents=1, n_search_objects=1, *args, **kwargs):
+        n_agents_total = n_agents + n_search_objects
         geometries = cubicasa.sample(n_envs, **kwargs)
-        scenery = scene.scenery(geometries, **kwargs)
+        scenery = scene.scenery(geometries, n_agents_total, **kwargs)
         self.core = core.Core(scenery, *args, res=256, fov=179, **kwargs)
-        self._battery = modules.BatteryLevel(self.core)
-        self._laser = modules.Laser(self.core, subsample=1)
-        self._depth = modules.Depth(self.core, subsample=1)
-        self._mover = modules.MomentumMovementOnOff(self.core)
+        self.n_controllable_agents = n_agents
+        self.n_search_objects = n_search_objects
+        self._battery = modules.BatteryLevel(self.core, n_agents=n_agents)
+        self._laser = modules.Laser(self.core, n_agents=n_agents, subsample=1)
+        self._depth = modules.Depth(self.core, n_agents=n_agents, subsample=1)
+        self._mover = modules.MomentumMovementOnOff(self.core, n_agents=n_agents)
         self._imu = modules.IMU(self.core)
         self._respawner = modules.RandomSpawns(geometries, self.core)
 
@@ -118,11 +121,10 @@ class SearchAndRescueBase:
             bounds=self._bounds[e].clone())
 
     @classmethod
-    def plot_state(cls, state):
-        n_agents = state.core.n_agents
+    def plot_state(self, state, n_agents):
 
         fig = plt.figure()
-        gs = plt.GridSpec(n_agents, 2, fig)
+        gs = plt.GridSpec(max(2, n_agents), 2, fig)
 
         colors = [f'C{i}' for i in range(n_agents)]
 
@@ -138,7 +140,7 @@ class SearchAndRescueBase:
             linewidth=1, edgecolor='k', facecolor=(0., 0., 0., 0.))
         plan.add_artist(bounds)
 
-        images = {'dep': state.dep}
+        images = {'dep': state.dep[:n_agents]}
         plotting.plot_images(images, [plt.subplot(gs[i, -1]) for i in range(n_agents)])
 
         s = (f'length: {state.length:d}/{state.max_length:.0f}\n'
@@ -146,7 +148,7 @@ class SearchAndRescueBase:
         plan.annotate(s, (5., 5.), xycoords='axes points')
 
         ax = plt.subplot(gs[-1, 0])
-        ax.barh(np_arange(n_agents), state.bat, color=colors)
+        ax.barh(np_arange(n_agents), state.bat[:n_agents], color=colors)
         ax.set_ylabel('battery')
         ax.set_yticks([])
         ax.invert_yaxis()
@@ -154,5 +156,5 @@ class SearchAndRescueBase:
 
         return fig
 
-    def display(self, d=0):
-        return self.plot_state(arrdict.numpyify(self.state(d)))
+    def display(self, d=0, n_agents=None):
+        return self.plot_state(arrdict.numpyify(self.state(d)), n_agents or self.core.n_agents)
