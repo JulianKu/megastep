@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from matplotlib import patches as mpl_patches
 from numpy import concatenate as np_concat, stack as np_stack, arange as np_arange
+from math import pi
 
 from megastep import modules, core, plotting, scene, cubicasa
 from rebar import arrdict, dotdict
@@ -62,12 +64,30 @@ class SearchAndRescueBase:
         result[mask] = tex_s.to(torch.long) + tex_i.to(torch.long)
         return result.unsqueeze(2)
 
+    def _search_objects_in_view(self, aux):
+        line_idxs = modules.downsample(aux.indices[:, :self.n_controllable_agents],
+                                       self._laser.subsample)[..., self._laser.subsample // 2]
+        obj_idxs = line_idxs // len(self.core.scenery.model)
+        mask = (0 <= line_idxs) & (obj_idxs >= self.n_controllable_agents) & (obj_idxs < self.n_search_objects)
+        objects_in_view = obj_idxs.where(mask, torch.full_like(line_idxs, -1))
+        search_objects = torch.arange(start=self.n_controllable_agents, end=self.n_all_entities, device=self.core.device)
+        obj_in_view = (objects_in_view[:, :, None] == search_objects[None, None, :, None, None]).any(-1).squeeze()
+        new_objs_in_view = obj_in_view & torch.logical_not(self._found_search_objects)
+
+        return new_objs_in_view
+
     def _reward(self, r, reset):
         texindices = self._tex_indices(r)
         self._seen[texindices] = True
 
         potential = torch.zeros_like(self._potential)
         potential.scatter_add_(0, self._tex_to_env, self._seen.float())
+
+        new_objects_in_view = self._search_objects_in_view(r)
+        self._tracked_search_objects.masked_fill_(torch.logical_not(new_objects_in_view), 0)
+        self._tracked_search_objects[new_objects_in_view] += 1
+        new_found_objects = self._tracked_search_objects >= self._time_to_detect
+        self._found_search_objects |= new_found_objects
 
         reward = (potential - self._potential) / self.core.res
         self._potential = potential
