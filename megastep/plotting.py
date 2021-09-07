@@ -126,9 +126,11 @@ def plot_wedge(ax, pose, distance, fov, radians=False, **kwargs):
                     pose.positions, distance, left, right, width=width, **kwargs)
     ax.add_patch(wedge)
 
-def plot_fov(ax, state, distance=1, field='agents'):
-    a = len(getattr(state, field).angles)
-    for i in range(a):
+def plot_fov(ax, state, n_agents=None, distance=1, field='agents'):
+    if n_agents is None:
+        n_agents = len(getattr(state, field).angles)
+
+    for i in range(n_agents):
         plot_wedge(ax, getattr(state, field)[i], distance, state.fov, color=f'C{i}', alpha=.1)
 
 def plot_poses(poses, ax=None, radians=True, color='C9', **kwargs):

@@ -121,7 +121,7 @@ class SearchAndRescueBase:
             bounds=self._bounds[e].clone())
 
     @classmethod
-    def plot_state(self, state, n_agents):
+    def plot_state(cls, state, n_agents):
 
         fig = plt.figure()
         gs = plt.GridSpec(max(2, n_agents), 2, fig)
@@ -131,7 +131,7 @@ class SearchAndRescueBase:
         alpha = .1 + .9 * state.seen.astype(float)
         # modifying this in place will bite me eventually. o for a lens
         state.core.scenery.textures.vals = np_concat([state.core.scenery.textures.vals, alpha[:, None]], 1)
-        plan = core.Core.plot_state(state.core, plt.subplot(gs[:-1, :-1]))
+        plan = core.Core.plot_state(state.core, n_agents, plt.subplot(gs[:-1, :-1]))
 
         # Add bounding box
         size = state.bounds[::-1] + 2 * CLEARANCE

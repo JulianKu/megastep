@@ -123,13 +123,13 @@ class Core:
                 progress=self.progress[e]))
     
     @classmethod
-    def plot_state(cls, state, ax=None, zoom=False):
+    def plot_state(cls, state, n_agents=None, ax=None, zoom=False):
         from . import plotting
         ax = ax or plt.axes()
         plotting.plot_lines(ax, state, zoom=zoom)
         plotting.plot_lights(ax, state)
         plotting.adjust_view(ax, state, zoom=zoom)
-        plotting.plot_fov(ax, state)
+        plotting.plot_fov(ax, state, n_agents)
         ax.set_xticks([])
         ax.set_yticks([])
         return ax
