@@ -4,20 +4,28 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from tqdm.auto import tqdm
+import yaml
 
 from megastep.demo.envs.search_and_rescue import SearchAndRescueBase
 from rebar import recording, arrdict
 
 SAVE_DIR = "recordings"
+CONFIG_DIR = "../configs"
+CONFIG_FILE = "baseconfig.yaml"
 
 if __name__ == '__main__':
-    seed = 10
-    n_envs = 5
-    n_agents = 1
-    n_search_objects = 4
+    configfile = Path(CONFIG_DIR) / CONFIG_FILE
+    with open(configfile, 'r') as file:
+        try:
+            config = yaml.safe_load(file)
+        except yaml.YAMLError as yerror:
+            print("Please provide valid config file (*.yaml)")
+            print(yerror)
+
+    seed = config['seed']
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
-    env = SearchAndRescueBase(n_envs, n_agents, n_search_objects, rng=rng)
+    env = SearchAndRescueBase(config['ENV'], rng=rng)
 
     # number of processes to use for encoding. None -> 1/2 of CPUs
     N = None
@@ -33,7 +41,8 @@ if __name__ == '__main__':
     with recording.ParallelEncoder(env.plot_state, N=N) as encoder, \
             tqdm(total=length) as pbar:
         while True:
-            decision = arrdict.arrdict(actions=torch.randint(9, size=(n_envs, n_agents)))
+            decision = arrdict.arrdict(actions=torch.randint(9, size=(config['ENV']['n_envs'],
+                                                                      config['ENV']['n_agents'])))
             world = env.step(decision)
             steps += 1
             pbar.update(1)
@@ -41,10 +50,10 @@ if __name__ == '__main__':
                 break
             state = env.state(d)
 
-            fig = env.display(0, n_agents)
+            fig = env.display(0, config['ENV']['n_agents'])
             plt.show()
 
-            encoder(arrdict.numpyify(arrdict.arrdict(**state, decision=decision)), n_agents)
+            encoder(arrdict.numpyify(arrdict.arrdict(**state, decision=decision)), config['ENV']['n_agents'])
             if steps == length:
                 break
 

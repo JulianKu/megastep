@@ -8,19 +8,22 @@ from rebar import arrdict, dotdict
 
 CLEARANCE = 1.
 
-
 class SearchAndRescueBase:
 
-    def __init__(self, n_envs, n_agents=1, n_search_objects=1, *args, **kwargs):
-        n_agents_total = n_agents + n_search_objects
+    def __init__(self, config, *args, **kwargs):
+        n_envs = config['n_envs']
+        n_agents = config['n_agents']
+        n_search_objects = config['n_search_objects']
+        n_all_entities = n_agents + n_search_objects
         geometries = cubicasa.sample(n_envs, **kwargs)
-        scenery = scene.scenery(geometries, n_agents_total, **kwargs)
-        self.core = core.Core(scenery, *args, res=256, fov=179, **kwargs)
+        scenery = scene.scenery(geometries, n_all_entities, **kwargs)
+        self.core = core.Core(scenery, *args, **config, **kwargs)
         self.n_controllable_agents = n_agents
         self.n_search_objects = n_search_objects
+        self.n_all_entities = n_all_entities
         self._battery = modules.BatteryLevel(self.core, n_agents=n_agents)
-        self._laser = modules.Laser(self.core, n_agents=n_agents, subsample=1)
-        self._depth = modules.Depth(self.core, n_agents=n_agents, subsample=1)
+        self._laser = modules.Laser(self.core, n_agents=n_agents, subsample=config['subsample'])
+        self._depth = modules.Depth(self.core, n_agents=n_agents, subsample=config['subsample'])
         self._mover = modules.MomentumMovementOnOff(self.core, n_agents=n_agents)
         self._imu = modules.IMU(self.core)
         self._respawner = modules.RandomSpawns(geometries, self.core)
