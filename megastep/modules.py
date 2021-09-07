@@ -273,7 +273,7 @@ class BatteryLevel:
 
 class Laser:
 
-    def __init__(self, core, n_agents=None, subsample=1, max_depth=10):
+    def __init__(self, core, n_agents=None, subsample=1, max_range=10):
         """Generates 2D laser scanner observations.
 
         :param core: The :class:`~megastep.core.Core` used by the environment.
@@ -282,16 +282,16 @@ class Laser:
         :param subsample: How many horizontal rays to average when generating the observations. For example, if the
             core is rendering at 256 rays and ``subsample`` is 4, then 64-ray observations will be returned.
             A higher subsampling rate makes for slower rendering, but smoother observations.
-        :param max_depth: The maximum depth, corresponding to a -1 in the observation. Given in meters.
+        :param max_range: The maximum depth, corresponding to a -1 in the observation. Given in meters.
 
         :var space: The :ref:`observation space <spaces>` to present to the controlling network.
-        :var max_depth: The value of the ``max_depth`` parameter.
+        :var max_range: The value of the ``max_depth`` parameter.
         :var subsample: The value of the ``subsample`` parameter.
         """
         n_agents = n_agents or core.n_agents
         self.core = core
         self.space = spaces.MultiVector(n_agents, core.res // subsample)
-        self.max_depth = max_depth
+        self.max_range = max_range
         self.subsample = subsample
 
     def __call__(self, r=None):
@@ -306,7 +306,7 @@ class Laser:
         :return: A (n_env, n_agent, 1, res)-tensor of values between 0 and ``max_depth`.
         """
         r = render(self.core) if r is None else r
-        ranges = (r.distances - self.core.agent_radius).clamp(0, self.max_depth)
+        ranges = (r.distances - self.core.agent_radius).clamp(0, self.max_range)
         self._last_obs = downsample(ranges, self.subsample).mean(-1).squeeze(-2)
         return self._last_obs
 
