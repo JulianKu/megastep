@@ -36,11 +36,18 @@ class SearchAndRescueBase:
             imu=self._imu.space)
 
         self._bounds = arrdict.torchify(np_stack([g.masks.shape * g.res for g in geometries])).to(self.core.device)
-        self._tex_to_env = self.core.scenery.lines.inverse[self.core.scenery.textures.inverse.long()].long()
+        self._tex_to_env = self.core.scenery.lines.inverse[self.core.scenery.textures.inverse.long()].long()[:, None]\
+            .repeat((1, n_agents))
         self._seen = torch.full_like(self._tex_to_env, False)
-        self._potential = self.core.env_full(0.)
+        agt_objs_tensor_size = (n_envs, n_agents, n_search_objects)
+        self._found_search_objects = torch.zeros(size=agt_objs_tensor_size, device=self.core.device,
+                                                 dtype=torch.bool)
+        self._tracked_search_objects = torch.zeros(size=agt_objs_tensor_size, device=self.core.device,
+                                                   dtype=torch.int)
+        self._time_to_detect = config['time_to_detect']
+        self._potential = torch.zeros((n_envs, n_agents), device=self.core.device, dtype=torch.float32)
 
-        self._lengths = torch.zeros(self.core.n_envs, device=self.core.device, dtype=torch.int)
+        self._lengths = torch.zeros((n_envs, n_agents), device=self.core.device, dtype=torch.int)
 
         self.device = self.core.device
 
@@ -71,7 +78,8 @@ class SearchAndRescueBase:
         return reward
 
     def _observe(self, reset):
-        r = modules.render(self.core)
+        r = modules.render(self.core)[:, :self.n_controllable_agents]
+
         obs = arrdict.arrdict(
             bat=self._battery(r),
             las=self._laser(r),
@@ -81,16 +89,17 @@ class SearchAndRescueBase:
         return obs, reward
 
     def _reset(self, reset=None):
-        self._respawner(reset.unsqueeze(-1))
-        self._seen[reset[self._tex_to_env]] = False
-        self._potential[reset] = 0
-        self._lengths[reset] = 0
+        self._respawner(reset)
+        controllable_agt_reset = reset[:, :self.n_controllable_agents]
+        self._seen[controllable_agt_reset[self._tex_to_env][:, 0]] = False
+        self._potential[controllable_agt_reset] = 0
+        self._lengths[controllable_agt_reset] = 0
 
     @torch.no_grad()
     def reset(self):
-        reset = self.core.env_full(True)
+        reset = self.core.agent_full(True)
         self._reset(reset)
-        obs, reward = self._observe(reset)
+        obs, reward = self._observe(reset[:, :self.n_controllable_agents])
         return arrdict.arrdict(
             obs=obs,
             reset=reset,
@@ -111,7 +120,7 @@ class SearchAndRescueBase:
             reward=reward)
 
     def state(self, e=0):
-        seen = self._seen[self._tex_to_env == e]
+        seen = self._seen.any(-1)[self._tex_to_env[:, 0] == e]
         return arrdict.arrdict(
             core=self.core.state(e),
             bat=self._battery.state(e),
@@ -146,8 +155,10 @@ class SearchAndRescueBase:
         images = {'dep': state.dep[:n_agents]}
         plotting.plot_images(images, [plt.subplot(gs[i, -1]) for i in range(n_agents)])
 
-        s = (f'length: {state.length:d}/{state.max_length:.0f}\n'
-             f'potential: {state.potential:.0f}')
+        s = ' '.join(['length:'] +
+                     [f'{stat_len}/{state.max_length[i]:.0f}' for i, stat_len in enumerate(state.length)] +
+                     ['\npotential:'] +
+                     [f'{pot:.0f}' for pot in state.potential])
         plan.annotate(s, (5., 5.), xycoords='axes points')
 
         ax = plt.subplot(gs[-1, 0])
