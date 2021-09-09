@@ -4,7 +4,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from rebar import arrdict
+
+from rebar import arrdict, dotdict
 from . import spaces, geometry, cuda, plotting
 
 
@@ -69,6 +70,16 @@ class SimpleMovement:
         core.agents.velocity[:, :n_agents] = to_global_frame(core.agents.angles[:, :n_agents], delta.velocity)
         return cuda.physics(core.scenery, core.agents)
 
+    def get_maximum_velocities(self):
+        """
+        Get the maximum absolute (linear and angular) velocities that this mover can output. The values are determined
+        by ``speed`` and ``ang_speed``.
+
+        :return: A :ref:`dotdict` with ``lin`` and ``ang`` key for linear and angular maximum velocity respectively.
+        """
+        return dotdict.dotdict(lin=self._actionset.velocity.abs().max(),
+                               ang=self._actionset.angvelocity.abs().max())
+
 
 class MomentumMovement:
 
@@ -124,6 +135,16 @@ class MomentumMovement:
         core.agents.velocity[:, :n_agents] = (1 - self.decay) * core.agents.velocity[:, :n_agents] + \
                                              to_global_frame(core.agents.angles[:, :n_agents], delta.velocity)
         return cuda.physics(core.scenery, core.agents)
+
+    def get_maximum_velocities(self):
+        """
+        Get the maximum absolute (linear and angular) velocities that this mover can output. The values are determined
+        by ``accel`` and ``ang_accel``.
+
+        :return: A :ref:`dotdict` with ``lin`` and ``ang`` key for linear and angular maximum velocity respectively.
+        """
+        return dotdict.dotdict(lin=self._actionset.velocity.abs().max(),
+                               ang=self._actionset.angvelocity.abs().max())
 
 
 class MomentumMovementOnOff:
@@ -188,6 +209,16 @@ class MomentumMovementOnOff:
                                               to_global_frame(core.agents.angles[:, :n_agents], delta.velocity))
         return cuda.physics(core.scenery, core.agents)
 
+    def get_maximum_velocities(self):
+        """
+        Get the maximum absolute (linear and angular) velocities that this mover can output. The values are determined
+        by ``accel`` and ``ang_accel``.
+
+        :return: A :ref:`dotdict` with ``lin`` and ``ang`` key for linear and angular maximum velocity respectively.
+        """
+        return dotdict.dotdict(lin=self._actionset.velocity.abs().max(),
+                               ang=self._actionset.angvelocity.abs().max())
+
 
 def unpack(d):
     """Unpacks :mod:`~megastep.cuda` datastructures into :ref:`arrdicts <dotdicts>` with the same attributes."""
@@ -221,7 +252,8 @@ def downsample(screen, subsample):
 
 class BatteryLevel:
 
-    def __init__(self, core, n_agents=None, scale_factor=0.1, lin_ang_factor=0.5, const_discharge=0.1):
+    def __init__(self, core, n_agents=None, velocity_scales=None, scale_factor=0.01, lin_ang_factor=0.5,
+                 const_motion_discharge=0.1, const_non_motion_discharge=0.02, **kwargs):
         """Generates battery level observations.
 
         :param core: The :class:`~megastep.core.Core` used by the environment.
@@ -231,17 +263,28 @@ class BatteryLevel:
             each step
         :param lin_ang_factor: blending factor between influence of linear and angular velocity on the discharge of the
             battery
-        :param const_discharge: constant discharge term that decreases battery level on top of velocity discharge (also
-            scaled by ``scale_factor``)
+        :param const_motion_discharge: constant discharge term that decreases battery level on top of velocity discharge
+            if motionstate=True even when velocity=0 (also scaled by ``scale_factor``)
+        :param const_non_motion_discharge: constant discharge term that slowly decreases battery level even if
+            motionstate=False (also scaled by ``scale_factor``)
 
         :var space: The :ref:`observation space <spaces>` to present to the controlling network.
         """
         n_agents = n_agents or core.n_agents
         self.core = core
         self.space = spaces.MultiConstant(n_agents)
+        if velocity_scales is None:
+            self._velocity_scales = dotdict.dotdict(lin=1., ang=1.)
+        elif isinstance(velocity_scales, (int, float)):
+            self._velocity_scales = dotdict.dotdict(lin=velocity_scales, ang=velocity_scales)
+        elif isinstance(velocity_scales, dotdict.dotdict):
+            self._velocity_scales = velocity_scales
+        else:
+            raise ValueError("velocity_scales has to be of numeric type or dotdict")
         self._scale_factor = scale_factor
         self._lin_ang_factor = lin_ang_factor
-        self._const_discharge = const_discharge
+        self._const_motion_discharge = const_motion_discharge
+        self._const_non_motion_discharge = const_non_motion_discharge
         self._battery_level = torch.ones_like(self.core.progress).to(self.core.device)
 
     def __call__(self, r=None):
@@ -257,12 +300,17 @@ class BatteryLevel:
         """
         if r is None:
             render(self.core)
-        lin_vel_magnitude = self.core.agents.velocity.norm(dim=-1)
+        agts = self.core.agents
+        vel_scales = self._velocity_scales
+        lin_vel_factor = agts.velocity.norm(dim=-1) / vel_scales.lin
+        ang_vel_factor = agts.angvelocity.abs() / vel_scales.ang
         lin_ang_factor = self._lin_ang_factor
-        self._battery_level -= self._scale_factor * (self.core.agents.motionstate *
-                                                     (lin_ang_factor * lin_vel_magnitude
-                                                      + (1 - lin_ang_factor) * self.core.agents.angvelocity)
-                                                     + self._const_discharge)
+        self._battery_level -= self._scale_factor * (agts.motionstate *
+                                                     (lin_ang_factor * lin_vel_factor
+                                                      + (1 - lin_ang_factor) * ang_vel_factor
+                                                      + self._const_motion_discharge)
+                                                     + self._const_non_motion_discharge)
+
 
         return self._battery_level
 
