@@ -145,6 +145,21 @@ def plot_fov(ax, state, n_agents=None, distance=1, field='agents'):
         plot_wedge(ax, getattr(state, field)[i], distance, state.fov, color=f'C{i}', alpha=.1)
 
 
+def plot_motionstate(ax, state, n_agents=None, marker_radius=0.05, marker_offset_dir=(1, 1), field='agents'):
+    state_field = getattr(state, field)
+    if n_agents is None:
+        n_agents = len(state_field.position)
+
+    marker_offset_len = sqrt(sum([i ** 2 for i in marker_offset_dir]))
+    marker_offset_normalized = np.array([marker_offset / marker_offset_len for marker_offset in marker_offset_dir])
+    offset_distance = core.AGENT_RADIUS
+    positions, motionstates = state_field.positions, state_field.motionstate
+    motionstate_markers = [mpl.patches.Circle(xy=positions[agt] + offset_distance * marker_offset_normalized,
+                                              radius=marker_radius,
+                                              color='green' if motionstates[agt] else 'red')
+                           for agt in range(n_agents)]
+    ax.add_collection(mpl.collections.PatchCollection(motionstate_markers, match_original=True))
+
 def plot_poses(poses, ax=None, radians=True, color='C9', **kwargs):
     """Not used directly here, but often useful for code using this module"""
     ax = ax or plt.subplot()

@@ -136,6 +136,7 @@ class Core:
         plotting.plot_lights(ax, state)
         plotting.adjust_view(ax, state, zoom=zoom)
         plotting.plot_fov(ax, state, n_agents)
+        plotting.plot_motionstate(ax, state, n_agents)
         ax.set_xticks([])
         ax.set_yticks([])
         return ax
