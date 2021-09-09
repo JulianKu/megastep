@@ -1,29 +1,33 @@
 """TODO-DOCS Deathmatch docs"""
-import torch
-from megastep import modules, core, plotting, spaces, scene, cubicasa
-from rebar import arrdict, dotdict
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib as mpl
+import torch
+
+from megastep import modules, core, plotting, spaces, scene, cubicasa
+from rebar import arrdict, dotdict
 
 CLEARANCE = 1.
+
 
 @dotdict.mapping
 def expand(x):
     B, A = x.shape[:2]
-    return x.reshape(B*A, 1, *x.shape[2:])
+    return x.reshape(B * A, 1, *x.shape[2:])
+
 
 @dotdict.mapping
 def collapse(x, n_agents):
     B = x.shape[0]
-    return x.reshape(B//n_agents, n_agents, *x.shape[2:])
+    return x.reshape(B // n_agents, n_agents, *x.shape[2:])
+
 
 class Deathmatch:
 
     def __init__(self, n_envs, n_agents, *args, **kwargs):
-        geometries = cubicasa.sample(max(n_envs//4, 1))
+        geometries = cubicasa.sample(max(n_envs // 4, 1))
         scenery = scene.scenery(geometries, n_agents)
-        self.core = core.Core(scenery, *args, res=4*128, fov=70, **kwargs)
+        self.core = core.Core(scenery, *args, res=4 * 128, fov=70, **kwargs)
         self._rgb = modules.RGB(self.core, n_agents=1, subsample=4)
         self._depth = modules.Depth(self.core, n_agents=1, subsample=4)
         self._imu = modules.IMU(self.core, n_agents=1)
@@ -37,11 +41,11 @@ class Deathmatch:
             imu=self._imu.space,
             health=spaces.MultiVector(1, 1))
 
-        self._bounds = arrdict.torchify(np.stack([g.masks.shape*g.res for g in geometries])).to(self.core.device)
+        self._bounds = arrdict.torchify(np.stack([g.masks.shape * g.res for g in geometries])).to(self.core.device)
         self._health = self.core.agent_full(np.nan)
         self._damage = self.core.agent_full(np.nan)
 
-        self.n_envs = self.core.n_envs*self.core.n_agents
+        self.n_envs = self.core.n_envs * self.core.n_agents
         self.device = self.core.device
 
     def _reset(self, reset=None):
@@ -53,36 +57,36 @@ class Deathmatch:
 
     def _shoot(self, opponents):
         res = opponents.size(-1)
-        middle = slice(res//2-1, res//2+1)
+        middle = slice(res // 2 - 1, res // 2 + 1)
         agents = torch.arange(self.core.n_agents, device=self.core.device)
         matchings = (opponents[:, :, None] == agents[None, None, :, None, None])[..., middle].any(-1).any(-1)
         self.matchings = matchings
-        
+
         hits = matchings.sum(2).float()
         wounds = matchings.sum(1).float()
 
-        self._damage[:] += .05*hits
+        self._damage[:] += .05 * hits
 
-        pos = self.core.agents.positions 
+        pos = self.core.agents.positions
         outside = (pos < -CLEARANCE).any(-1) | (pos > (self._bounds[:, None] + CLEARANCE)).any(-1)
 
         # 5% damage per hit, .1% damage per timestep
-        self._health[:] += -.05*(wounds + outside) - .001
-        
+        self._health[:] += -.05 * (wounds + outside) - .001
+
         return hits.reshape(-1)
 
     def _observe(self):
         r = modules.render(self.core)
-        line_idxs = modules.downsample(r.indices, self._rgb.subsample)[..., self._rgb.subsample//2]
-        obj_idxs = line_idxs//len(self.core.scenery.model)
+        line_idxs = modules.downsample(r.indices, self._rgb.subsample)[..., self._rgb.subsample // 2]
+        obj_idxs = line_idxs // len(self.core.scenery.model)
         mask = (0 <= line_idxs) & (obj_idxs < self.core.n_agents)
         opponents = obj_idxs.where(mask, torch.full_like(line_idxs, -1))
         hits = self._shoot(opponents)
         obs = arrdict.arrdict(
-                rgb=self._rgb(r), 
-                d=self._depth(r), 
-                imu=self._imu(),
-                health=self._health.unsqueeze(-1).clone())
+            rgb=self._rgb(r),
+            d=self._depth(r),
+            imu=self._imu(),
+            health=self._health.unsqueeze(-1).clone())
         return obs, hits
 
     @torch.no_grad()
@@ -134,9 +138,9 @@ class Deathmatch:
         plan.add_collection(lines)
 
         # Add bounding box
-        size = state.bounds[::-1] + 2*CLEARANCE
+        size = state.bounds[::-1] + 2 * CLEARANCE
         bounds = mpl.patches.Rectangle(
-            (-CLEARANCE, -CLEARANCE), *size, 
+            (-CLEARANCE, -CLEARANCE), *size,
             linewidth=1, edgecolor='k', facecolor=(0., 0., 0., 0.))
         plan.add_artist(bounds)
 

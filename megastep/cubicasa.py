@@ -1,16 +1,17 @@
-from io import BytesIO
-import logging
-import requests
-from tqdm.auto import tqdm
-from zipfile import ZipFile
-import pandas as pd
-from pathlib import Path
-import gzip
-import numpy as np
-from rebar import parallel, dotdict
 import ast
-from pkg_resources import resource_filename
+import gzip
+import logging
+from io import BytesIO
 from pathlib import Path
+from zipfile import ZipFile
+
+import numpy as np
+import pandas as pd
+import requests
+from pkg_resources import resource_filename
+from tqdm.auto import tqdm
+
+from rebar import parallel, dotdict
 
 log = logging.getLogger(__name__)
 
@@ -36,9 +37,10 @@ python -c "from megastep import cubicasa; cubicasa.force_confirm()
 
 PATH = Path(resource_filename(__package__, '.cubicasa-confirmed'))
 
+
 def confirm():
     if PATH.exists():
-        return 
+        return
 
     print(LICENSE)
     print('Please enter "Y" to confirm you understand this.\n', flush=True)
@@ -46,10 +48,11 @@ def confirm():
     if i in 'yY':
         PATH.touch()
         print('\nConfirmed.')
-        return 
+        return
     else:
         print(REJECTION.format(i=i))
         raise ValueError('You refused to confirm that you understand the license restrictions.')
+
 
 def force_confirm():
     """:ref:`As described in the FAQ <cubicasa-license>, the cubicasa dataset has a non-commercial use restriction`. 
@@ -62,6 +65,7 @@ def force_confirm():
     print('By calling `force_confirm`, you confirm you understand this.')
     PATH.touch()
 
+
 def download(url):
     bs = BytesIO()
     log.info(f'Downloading {url}')
@@ -69,10 +73,11 @@ def download(url):
         r.raise_for_status()
         total = int(r.headers['Content-Length']) if 'Content-Length' in r.headers else None
         with tqdm(total=total, unit_scale=True, unit_divisor=1024, unit='B') as pbar:
-            for chunk in r.iter_content(chunk_size=2**20): 
+            for chunk in r.iter_content(chunk_size=2 ** 20):
                 pbar.update(len(chunk))
                 bs.write(chunk)
     return bs.getvalue()
+
 
 def cubicasa5k():
     p = Path('.cache/cubicasa.zip')
@@ -81,6 +86,7 @@ def cubicasa5k():
         p.parent.mkdir(exist_ok=True, parents=True)
         p.write_bytes(download(url))
     return str(p)
+
 
 def svg_data(regenerate=False):
     p = Path('.cache/cubicasa-svgs.json.gz')
@@ -91,18 +97,19 @@ def svg_data(regenerate=False):
             with ZipFile(cubicasa5k()) as zf:
                 pattern = r'cubicasa5k/(?P<category>[^/]*)/(?P<id>\d+)/(?P<filename>[^.]*)\.svg'
                 svgs = (pd.Series(zf.namelist(), name='path')
-                            .to_frame()
-                            .loc[lambda df: df.path.str.match(pattern)]
-                            .reset_index(drop=True))
+                        .to_frame()
+                        .loc[lambda df: df.path.str.match(pattern)]
+                        .reset_index(drop=True))
                 svgs = pd.concat([svgs, svgs.path.str.extract(pattern)], axis=1)
                 svgs['svg'] = svgs.path.apply(lambda p: zf.read(p).decode())
                 compressed = gzip.compress(svgs.to_json().encode())
                 p.write_bytes(compressed)
         else:
-            #TODO: Shift this to Github 
+            # TODO: Shift this to Github
             url = 'https://www.dropbox.com/s/iblduqobhqomz4g/cubicasa-svgs.json.gzip?raw=1'
             p.write_bytes(download(url))
     return pd.read_json(gzip.decompress(p.read_bytes()))
+
 
 def flatten(tree):
     flat = {}
@@ -114,6 +121,7 @@ def flatten(tree):
             flat[k] = v
     return flat
 
+
 def unflatten(d):
     tree = type(d)()
     for k, v in d.items():
@@ -123,15 +131,17 @@ def unflatten(d):
             node = node.setdefault(p, type(d)())
         node[parts[-1]] = v
     return tree
-        
+
+
 def safe_geometry(id, svg):
-    try: 
+    try:
         # Hide the import since it uses a fair number of libraries not used elsewhere.
         from . import geometry
         return geometry.geometry(svg)
     except:
         # We'll lose ~8 SVGs to them not having any spaces
         log.info(f'Geometry generation failed on on #{id}')
+
 
 def fastload(raw):
     """Most of the time in np.load is spent parsing the header, since it could have a giant mess of record types in
@@ -143,8 +153,9 @@ def fastload(raw):
     
     Credit to @pag for pointing this out to me once upon a time"""
     headerlen = np.frombuffer(raw[8:9], dtype=np.uint8)[0]
-    header = ast.literal_eval(raw[10:10+headerlen].decode())
-    return np.frombuffer(raw[10+headerlen:], dtype=header['descr']).reshape(header['shape'])
+    header = ast.literal_eval(raw[10:10 + headerlen].decode())
+    return np.frombuffer(raw[10 + headerlen:], dtype=header['descr']).reshape(header['shape'])
+
 
 def geometry_data(regenerate=False):
     # Why .npz.gz? Because applying gzip manually manages x10 better compression than
@@ -163,7 +174,7 @@ def geometry_data(regenerate=False):
             np.savez(bs, **gs)
             p.write_bytes(gzip.compress(bs.getvalue()))
         else:
-            #TODO: Shift this to Github 
+            # TODO: Shift this to Github
             url = 'https://www.dropbox.com/s/3ohut8lvmr8lkwg/cubicasa-geometry.npz.gz?raw=1'
             p.write_bytes(download(url))
 
@@ -173,7 +184,10 @@ def geometry_data(regenerate=False):
         flat = dotdict.dotdict({n[:-4]: fastload(zf.read(n)) for n in zf.namelist()})
     return unflatten(flat)
 
+
 _cache = None
+
+
 def sample(n_geometries, split='training', rng=np.random.default_rng(), **kwargs):
     """Returns a random sample of cubicasa :ref:`geometries <geometry>`. 
 
@@ -209,8 +223,8 @@ def sample(n_geometries, split='training', rng=np.random.default_rng(), **kwargs
         _cache = geometry_data()
         # Add the ID, since we're going to return this as a list
         _cache = type(_cache)({k: type(v)({'id': k, **v}) for k, v in _cache.items()})
-    
-    cutoff = int(.9*len(_cache))
+
+    cutoff = int(.9 * len(_cache))
     order = rng.permutation(sorted(_cache))
     if split == 'training':
         order = order[:cutoff]

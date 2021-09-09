@@ -1,14 +1,13 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from matplotlib import patches as mpl_patches
 from numpy import concatenate as np_concat, stack as np_stack, arange as np_arange
-from math import pi
 
 from megastep import modules, core, plotting, scene, cubicasa
 from rebar import arrdict, dotdict
 
 CLEARANCE = 1.
+
 
 class SearchAndRescueBase:
 
@@ -38,7 +37,7 @@ class SearchAndRescueBase:
             imu=self._imu.space)
 
         self._bounds = arrdict.torchify(np_stack([g.masks.shape * g.res for g in geometries])).to(self.core.device)
-        self._tex_to_env = self.core.scenery.lines.inverse[self.core.scenery.textures.inverse.long()].long()[:, None]\
+        self._tex_to_env = self.core.scenery.lines.inverse[self.core.scenery.textures.inverse.long()].long()[:, None] \
             .repeat((1, n_agents))
         self._seen = torch.full_like(self._tex_to_env, False)
         agt_objs_tensor_size = (n_envs, n_agents, n_search_objects)

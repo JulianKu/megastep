@@ -1,14 +1,17 @@
-import torch
-import numpy as np
 import inspect
-from ..contextlib import maybeasynccontextmanager
-from .. import numpy
-from . import categories
 from functools import partial
+
+import numpy as np
+import torch
+
+from . import categories
+from .. import numpy
+from ..contextlib import maybeasynccontextmanager
 
 __all__ = ['to_dir', 'defer', 'record']
 
 WRITER = None
+
 
 @maybeasynccontextmanager
 def to_dir(run_name):
@@ -19,6 +22,8 @@ def to_dir(run_name):
         yield
     finally:
         WRITER = old
+
+
 def clean(x):
     if isinstance(x, torch.Tensor):
         x = x.detach().cpu().numpy()
@@ -28,9 +33,10 @@ def clean(x):
         return {k: clean(v) for k, v in x.items()}
     return x
 
+
 def eager_record(category, field, *args, **kwargs):
     if WRITER is None:
-        return 
+        return
     if not isinstance(field, str):
         raise ValueError(f'Field should be a string, is actually {field}')
 
@@ -43,15 +49,20 @@ def eager_record(category, field, *args, **kwargs):
 
     WRITER.write(f'{category}/{field}', call)
 
+
 _record = eager_record
 QUEUE = None
 
+
 def record(*args, **kwargs):
     return _record(*args, **kwargs)
+
+
 def deferred_record(category, field, *args, **kwargs):
     if not isinstance(field, str):
         raise ValueError(f'Field should be a string, is actually {field}')
     QUEUE.append((category, field, args, kwargs))
+
 
 def _mono_getter(collection, x):
     dtype = x.dtype
@@ -63,12 +74,16 @@ def _mono_getter(collection, x):
 
     def f(collection):
         return collection[dtype][start:end].reshape(x.shape)
+
     return f
+
 
 def _dummy_getter(x):
     def f(collection):
         return x
+
     return f
+
 
 def _multi_getter(collection, *args, **kwargs):
     arggetters = []
@@ -89,7 +104,9 @@ def _multi_getter(collection, *args, **kwargs):
         args = tuple(g(collection) for g in arggetters)
         kwargs = {k: g(collection) for k, g in kwarggetters.items()}
         return args, kwargs
+
     return f
+
 
 def _gather(queue):
     collection = {}
@@ -98,6 +115,7 @@ def _gather(queue):
         getters.append((category, field, _multi_getter(collection, *args, **kwargs)))
     collection = {k: torch.cat(v).detach().cpu() for k, v in collection.items()}
     return collection, getters
+
 
 @maybeasynccontextmanager
 def defer():
@@ -120,9 +138,10 @@ def defer():
 
             if WRITER is not None:
                 WRITER.write(f'{category}/{field}', call)
-    
+
         QUEUE = None
         _record = eager_record
+
 
 for c in categories.CATEGORIES:
     locals()[c] = partial(record, c)

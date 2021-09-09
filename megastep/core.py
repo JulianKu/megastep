@@ -1,9 +1,11 @@
-import numpy as np
-from . import scene, cuda, ragged
-import torch
 import logging
-from rebar import arrdict, dotdict
+
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
+
+from rebar import arrdict, dotdict
+from . import cuda
 
 log = logging.getLogger(__name__)
 
@@ -11,27 +13,31 @@ AGENT_WIDTH = .15
 TEXTURE_RES = .05
 
 # Used for collision radius and near camera plane
-AGENT_RADIUS = 1/2**.5*AGENT_WIDTH
+AGENT_RADIUS = 1 / 2 ** .5 * AGENT_WIDTH
 
-def gamma_encode(x): 
+
+def gamma_encode(x):
     """Converts RGB data to `viewable values <https://en.wikipedia.org/wiki/Gamma_correction>`_."""
-    return x**(1/2.2)
+    return x ** (1 / 2.2)
+
 
 def gamma_decode(x):
     """Converts RGB data to `interpolatable values <https://en.wikipedia.org/wiki/Gamma_correction>`_."""
-    return x**2.2
+    return x ** 2.2
+
 
 def _init_agents(n_envs, n_agents, device='cuda'):
     """Creates and returns an Agents datastructure"""
     data = arrdict.arrdict(
-            angles=torch.zeros((n_envs, n_agents)),
-            positions=torch.zeros((n_envs, n_agents, 2)),
-            angvelocity=torch.zeros((n_envs, n_agents)),
-            velocity=torch.zeros((n_envs, n_agents, 2)),
-            motionstate=torch.zeros((n_envs, n_agents)))
+        angles=torch.zeros((n_envs, n_agents)),
+        positions=torch.zeros((n_envs, n_agents, 2)),
+        angvelocity=torch.zeros((n_envs, n_agents)),
+        velocity=torch.zeros((n_envs, n_agents, 2)),
+        motionstate=torch.zeros((n_envs, n_agents)))
     return cuda.Agents(**data.to(device))
 
-class Core: 
+
+class Core:
 
     def __init__(self, scenery, res=64, fov=130, fps=10, rng=np.random.default_rng(), **kwargs):
         """The core rendering and physics interface. 
@@ -85,7 +91,7 @@ class Core:
         assert fov < 180, 'FOV should be less than 180°'
 
         cuda.initialize(self.agent_radius, self.res, self.fov, self.fps)
-        self.scenery = scenery 
+        self.scenery = scenery
         self.agents = _init_agents(self.n_envs, self.n_agents, self.device)
         self.progress = torch.ones((self.n_envs, self.n_agents), device=self.device)
 
@@ -112,16 +118,16 @@ class Core:
                             positions    Tensor((4, 2), torch.float32)
             progress        Tensor((4,), torch.float32)
 
-        This state tree is usually passed onto a :ref:`plotting` function.""" 
+        This state tree is usually passed onto a :ref:`plotting` function."""
         options = ('n_envs', 'n_agents', 'res', 'fov', 'agent_radius', 'fps')
         options = {k: getattr(self, k) for k in options}
 
         return arrdict.clone(dotdict.dotdict(
-                **options,
-                scenery=self.scenery.state(e),
-                agents=self.agents.state(e),
-                progress=self.progress[e]))
-    
+            **options,
+            scenery=self.scenery.state(e),
+            agents=self.agents.state(e),
+            progress=self.progress[e]))
+
     @classmethod
     def plot_state(cls, state, n_agents=None, ax=None, zoom=False):
         from . import plotting

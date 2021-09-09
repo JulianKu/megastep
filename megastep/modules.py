@@ -1,11 +1,11 @@
 """:mod:`megastep.modules` are chunks of functionality that often turn up in megastep environments. 
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from rebar import arrdict
 from . import spaces, geometry, cuda, plotting
-import matplotlib.pyplot as plt
 
 
 def to_local_frame(angles, p):
@@ -119,9 +119,10 @@ class MomentumMovement:
         n_agents = self.space.shape[0]
         core = self.core
         delta = self._actionset[decision.actions.long()]
-        core.agents.angvelocity[:, :n_agents] = (1 - self.decay) * core.agents.angvelocity[:, :n_agents] + delta.angvelocity
+        core.agents.angvelocity[:, :n_agents] = (1 - self.decay) * core.agents.angvelocity[:, :n_agents] + \
+                                                delta.angvelocity
         core.agents.velocity[:, :n_agents] = (1 - self.decay) * core.agents.velocity[:, :n_agents] + \
-                                          to_global_frame(core.agents.angles[:, :n_agents], delta.velocity)
+                                             to_global_frame(core.agents.angles[:, :n_agents], delta.velocity)
         return cuda.physics(core.scenery, core.agents)
 
 
@@ -180,11 +181,11 @@ class MomentumMovementOnOff:
         delta = self._actionset[decision.actions.long()]
         core.agents.motionstate[:, :n_agents].masked_fill_(delta.onoff < 0, 0.).masked_fill_(delta.onoff > 0, 1.)
         core.agents.angvelocity[:, :n_agents] = core.agents.motionstate[:, :n_agents] * \
-                                             ((1 - self.decay) * core.agents.angvelocity[:, :n_agents] +
-                                              delta.angvelocity[:, :n_agents])
+                                                ((1 - self.decay) * core.agents.angvelocity[:, :n_agents] +
+                                                 delta.angvelocity[:, :n_agents])
         core.agents.velocity[:, :n_agents] = core.agents.motionstate[:, :n_agents].unsqueeze(-1) * \
-                                          ((1 - self.decay) * core.agents.velocity[:, :n_agents] +
-                                           to_global_frame(core.agents.angles[:, :n_agents], delta.velocity))
+                                             ((1 - self.decay) * core.agents.velocity[:, :n_agents] +
+                                              to_global_frame(core.agents.angles[:, :n_agents], delta.velocity))
         return cuda.physics(core.scenery, core.agents)
 
 

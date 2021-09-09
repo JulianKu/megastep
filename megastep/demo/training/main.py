@@ -1,10 +1,10 @@
 from datetime import datetime
 from pathlib import Path
-import matplotlib.pyplot as plt
+
 import numpy as np
 import torch
-from tqdm.auto import tqdm
 import yaml
+from tqdm.auto import tqdm
 
 from megastep.demo.envs.search_and_rescue import SearchAndRescueBase
 from rebar import recording, arrdict

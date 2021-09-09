@@ -1,16 +1,18 @@
-import time
-import torch
-from .. import numpy, paths, widgets, logging
-import re
-import numpy as np
-from .. import arrdict
-from . import categories
-import pandas as pd
-import threading
-from contextlib import contextmanager
 import _thread
+import re
+import threading
+import time
+from contextlib import contextmanager
+
+import numpy as np
+import pandas as pd
+
+from . import categories
+from .. import arrdict
+from .. import numpy, paths, widgets, logging
 
 log = logging.getLogger(__name__)
+
 
 def format(v):
     if isinstance(v, int):
@@ -23,6 +25,7 @@ def format(v):
         return '{' + ', '.join(f'{k}: {format(vv)}' for k, vv in v.items()) + '}'
     return str(v)
 
+
 def adaptive_rule(df):
     timespan = (df.index[-1] - df.index[0]).total_seconds()
     if timespan < 600:
@@ -31,7 +34,8 @@ def adaptive_rule(df):
         return '1min'
     else:
         return '10min'
-    
+
+
 class Reader:
 
     def __init__(self, run_name, prefix=''):
@@ -40,7 +44,7 @@ class Reader:
         self._arrs = {}
 
     def arrays(self):
-        #TODO: If this gets slow, do amortized allocation of arrays x2 as big as needed
+        # TODO: If this gets slow, do amortized allocation of arrays x2 as big as needed
         for channel, new in self._reader.read().items():
             category, field = re.match(r'^(.*?)/(.*)$', channel).groups()
             if field.startswith(self._prefix):
@@ -57,7 +61,7 @@ class Reader:
             df.index.name = 'time'
             dfs[category, field] = df
         return arrdict.arrdict(dfs)
-        
+
     def resample(self, rule='60s', **kwargs):
         kwargs = {'rule': rule, **kwargs}
 
@@ -73,8 +77,10 @@ class Reader:
         else:
             return pd.DataFrame(index=pd.TimedeltaIndex([], name='time'))
 
+
 def arrays(prefix='', run_name=-1):
     return Reader(run_name, prefix).arrays()
+
 
 def pandas(name, run_name=-1):
     dfs = Reader(run_name, name).pandas()
@@ -82,8 +88,10 @@ def pandas(name, run_name=-1):
         return df
     raise KeyError(f'Couldn\'t find a statistic matching {name}')
 
+
 def resample(prefix='', run_name=-1, rule='60s'):
     return Reader(run_name, prefix).resample(rule)
+
 
 def tdformat(td):
     """How is this not in Python, numpy or pandas?"""
@@ -98,6 +106,7 @@ def tdformat(td):
     else:
         return f'{h:.0f}h{m:02.0f}m{s:02.0f}s'
 
+
 def __from_dir(canceller, run_name, out, rule, throttle=1):
     reader = Reader(run_name)
     start = pd.Timestamp.now()
@@ -111,10 +120,10 @@ def __from_dir(canceller, run_name, out, rule, throttle=1):
             # left with an almost-empty last interval.
             base = int(time.time() % 60) + 5
             values = reader.resample(rule=rule, base=base)
-            
+
             if len(values) > 0:
                 values = values.ffill(limit=1).iloc[-1].to_dict()
-                key_length = max([len(str(k)) for k in values], default=0)+1
+                key_length = max([len(str(k)) for k in values], default=0) + 1
                 content = '\n'.join(f'{{:{key_length}s}} {{}}'.format(k, format(values[k])) for k in sorted(values))
             else:
                 content = 'No stats yet'
@@ -128,12 +137,14 @@ def __from_dir(canceller, run_name, out, rule, throttle=1):
 
         time.sleep(.1)
 
+
 def _from_dir(*args, **kwargs):
     try:
         __from_dir(*args, **kwargs)
     except KeyboardInterrupt:
         log.info('Interrupting main')
         _thread.interrupt_main()
+
 
 @contextmanager
 def from_dir(run_name, compositor=None, rule='60s'):

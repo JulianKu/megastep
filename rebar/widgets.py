@@ -1,8 +1,10 @@
-import ipywidgets as widgets
-from IPython.display import display, clear_output
 import threading
 
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+
 WRITE_LOCK = threading.RLock()
+
 
 class Output:
 
@@ -17,9 +19,10 @@ class Output:
         with WRITE_LOCK, self._output:
             clear_output(wait=True)
             print(content)
-    
+
     def close(self):
         self._compositor.remove(self._output)
+
 
 class Compositor:
 

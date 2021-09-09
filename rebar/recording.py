@@ -1,25 +1,27 @@
-import av
-from io import BytesIO
-import numpy as np
 import base64
-from IPython.display import display, HTML
-from pathlib import Path
-from multiprocessing import cpu_count
-import matplotlib.pyplot as plt
-from tqdm.auto import tqdm
-from .parallel import parallel
 import logging
-import time
 import multiprocessing
-from matplotlib import tight_bbox
 import numbers
 import sys
+import time
+from io import BytesIO
+from pathlib import Path
+
+import av
+import matplotlib.pyplot as plt
+import numpy as np
+from IPython.display import display, HTML
+from matplotlib import tight_bbox
+
+from .parallel import parallel
 
 log = logging.getLogger(__name__)
+
 
 def adjust_bbox(fig):
     bbox = fig.get_tightbbox(fig.canvas.get_renderer())
     tight_bbox.adjust_bbox(fig, bbox, fig.canvas.fixed_dpi)
+
 
 def array(fig):
     adjust_bbox(fig)
@@ -27,11 +29,12 @@ def array(fig):
     renderer = fig.canvas.get_renderer()
     w, h = int(renderer.width), int(renderer.height)
     # Resolution must even, else libx264 gets upset
-    h2, w2 = 2*(h//2), 2*(w//2)
+    h2, w2 = 2 * (h // 2), 2 * (w // 2)
     return (np.frombuffer(renderer.buffer_rgba(), np.uint8)
-                        .reshape((h, w, 4))
-                        [:h2, :w2, :3]
-                        .copy())
+            .reshape((h, w, 4))
+            [:h2, :w2, :3]
+            .copy())
+
 
 class Encoder:
 
@@ -72,7 +75,7 @@ class Encoder:
         self.mimetype = 'mp4'
 
         self._initialized = True
-    
+
     def __enter__(self):
         return self
 
@@ -87,7 +90,7 @@ class Encoder:
 
         # Float arrs are assumed to have a domain of [0, 1], for backward-compatability with OpenCV.
         if np.issubdtype(arr.dtype, np.floating):
-            arr = (255*arr)
+            arr = (255 * arr)
         if not np.issubdtype(arr.dtype, np.uint8):
             arr = arr.astype(np.uint8).clip(0, 255)
 
@@ -103,7 +106,8 @@ class Encoder:
                 self._container.mux(self._stream.encode())
                 self._container.close()
                 self.value = self._content.getvalue()
-        
+
+
 def html_tag(video, height=None, **kwargs):
     video = video.value if isinstance(video, Encoder) else video
     style = f'style="height: {height}px"' if height else ''
@@ -114,14 +118,17 @@ def html_tag(video, height=None, **kwargs):
     Your browser does not support the video tag.
 </video>"""
 
+
 def notebook(video, height=640):
     return display(HTML(html_tag(video, height)))
+
 
 def _init():
     # Suppress keyboard interrupt of workers, since exiting the context 
     # manager in the parent will shut them down.
     import signal
     signal.signal(signal.SIGINT, lambda h, f: None)
+
 
 def _array(f, *args, **kwargs):
     result = f(*args, **kwargs)
@@ -131,6 +138,7 @@ def _array(f, *args, **kwargs):
         return arr
     else:
         return result
+
 
 class ParallelEncoder:
 
@@ -158,11 +166,11 @@ class ParallelEncoder:
         """
         cpus = multiprocessing.cpu_count()
         if N is None:
-            N = cpus//2
+            N = cpus // 2
         elif isinstance(N, numbers.Integral):
             N = N
         elif isinstance(N, numbers.Real):
-            N = int(cpus*N)
+            N = int(cpus * N)
         else:
             raise ValueError(f'Number of processes must be an integer, a float, or None. Got a "{type(N)}"')
 

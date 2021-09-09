@@ -12,9 +12,9 @@
 #
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
 print(sys.path)
-
 
 # -- Project information -----------------------------------------------------
 
@@ -24,7 +24,6 @@ author = 'Andy L. Jones'
 
 # The full version, including alpha/beta/rc tags
 release = '0.1'
-
 
 # -- General configuration ---------------------------------------------------
 
@@ -44,7 +43,6 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -81,6 +79,7 @@ autoclass_content = 'both'
 autodoc_member_order = 'bysource'
 
 extlinks = {'github': ('https://github.com/andyljones/megastep/tree/master/%s', '')}
+
 
 def linkcode_resolve(domain, info):
     if domain != 'py':

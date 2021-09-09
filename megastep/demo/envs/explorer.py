@@ -1,16 +1,18 @@
 """TODO-DOCS Explorer docs"""
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
+
 from megastep import modules, core, plotting, scene, cubicasa
 from rebar import arrdict, dotdict
-import matplotlib.pyplot as plt
 
-class Explorer: 
+
+class Explorer:
 
     def __init__(self, n_envs, *args, **kwargs):
         geometries = cubicasa.sample(n_envs)
         scenery = scene.scenery(geometries, 1)
-        self.core = core.Core(scenery, *args, res=4*64, fov=130, **kwargs)
+        self.core = core.Core(scenery, *args, res=4 * 64, fov=130, **kwargs)
         self._rgb = modules.RGB(self.core, n_agents=1, subsample=4)
         self._depth = modules.Depth(self.core, n_agents=1, subsample=4)
         self._mover = modules.MomentumMovement(self.core)
@@ -31,13 +33,13 @@ class Explorer:
 
         self.device = self.core.device
 
-    def _tex_indices(self, aux): 
-        scenery = self.core.scenery 
+    def _tex_indices(self, aux):
+        scenery = self.core.scenery
         mask = aux.indices >= 0
         result = torch.full_like(aux.indices, -1, dtype=torch.long)
         tex_n = (scenery.lines.starts[:, None, None, None] + aux.indices)[mask]
         tex_w = scenery.textures.widths[tex_n.to(torch.long)]
-        tex_i = torch.min(torch.floor(tex_w.to(torch.float)*aux.locations[mask]), tex_w.to(torch.float)-1)
+        tex_i = torch.min(torch.floor(tex_w.to(torch.float) * aux.locations[mask]), tex_w.to(torch.float) - 1)
         tex_s = scenery.textures.starts[tex_n.to(torch.long)]
         result[mask] = tex_s.to(torch.long) + tex_i.to(torch.long)
         return result.unsqueeze(2)
@@ -49,7 +51,7 @@ class Explorer:
         potential = torch.zeros_like(self._potential)
         potential.scatter_add_(0, self._tex_to_env, self._seen.float())
 
-        reward = (potential - self._potential)/(self.core.res//self._rgb.subsample)
+        reward = (potential - self._potential) / (self.core.res // self._rgb.subsample)
         self._potential = potential
 
         # Should I render twice so that the last reward is accurate?
@@ -60,9 +62,9 @@ class Explorer:
     def _observe(self, reset):
         r = modules.render(self.core)
         obs = arrdict.arrdict(
-                rgb=self._rgb(r), 
-                d=self._depth(r), 
-                imu=self._imu())
+            rgb=self._rgb(r),
+            d=self._depth(r),
+            imu=self._imu())
         reward = self._reward(r, reset)
         return obs, reward
 
@@ -79,7 +81,7 @@ class Explorer:
         obs, reward = self._observe(reset)
         return arrdict.arrdict(
             obs=obs,
-            reset=reset, 
+            reset=reset,
             reward=reward)
 
     @torch.no_grad()
@@ -93,8 +95,8 @@ class Explorer:
         obs, reward = self._observe(reset)
         return arrdict.arrdict(
             obs=obs,
-            reset=reset, 
-            reward=reward) 
+            reset=reset,
+            reward=reward)
 
     def state(self, e=0):
         seen = self._seen[self._tex_to_env == e]
@@ -112,7 +114,7 @@ class Explorer:
         fig = plt.figure()
         gs = plt.GridSpec(2, 2, fig, 0, 0, 1, 1)
 
-        alpha = .1 + .9*state.seen.astype(float)
+        alpha = .1 + .9 * state.seen.astype(float)
         # modifying this in place will bite me eventually. o for a lens
         state.core.scenery.textures.vals = np.concatenate([state.core.scenery.textures.vals, alpha[:, None]], 1)
         ax = core.Core.plot_state(state.core, plt.subplot(gs[:, 0]))
@@ -121,11 +123,10 @@ class Explorer:
         plotting.plot_images(images, [plt.subplot(gs[:, 1])])
 
         s = (f'length: {state.length:d}/{state.max_length:.0f}\n'
-            f'potential: {state.potential:.0f}')
+             f'potential: {state.potential:.0f}')
         ax.annotate(s, (5., 5.), xycoords='axes points')
 
         return fig
 
     def display(self, d=0):
         return self.plot_state(arrdict.numpyify(self.state(d)))
-

@@ -1,13 +1,16 @@
+import time
+from collections import defaultdict
+from io import BytesIO
+
 import numpy as np
 from numpy.lib import format as npformat
+
 from . import paths
-from io import BytesIO
-from datetime import datetime
-from collections import defaultdict
-import time
+
 
 def infer_dtype(exemplar):
     return np.dtype([(k, v.dtype if isinstance(v, np.generic) else type(v)) for k, v in exemplar.items()])
+
 
 def make_header(dtype):
     """
@@ -19,11 +22,12 @@ def make_header(dtype):
 
     bs = BytesIO()
     npformat._write_array_header(bs, {
-        'descr': dtype.descr, 
-        'fortran_order': False, 
+        'descr': dtype.descr,
+        'fortran_order': False,
         'shape': (0,)},
-        version=(3, 0))
+                                 version=(3, 0))
     return bs.getvalue()
+
 
 class FileWriter:
 
@@ -32,7 +36,7 @@ class FileWriter:
         self._file = None
         self._period = 5
         self._next = time.time()
-        
+
     def _init(self, exemplar):
         self._file = self._path.open('wb', buffering=4096)
         self._dtype = infer_dtype(exemplar)
@@ -50,6 +54,7 @@ class FileWriter:
     def close(self):
         self._file.close()
         self._file = None
+
 
 class Writer:
 
@@ -76,6 +81,7 @@ class Writer:
             w.close()
         self._writers = {}
 
+
 class FileReader:
 
     def __init__(self, path):
@@ -83,7 +89,7 @@ class FileReader:
         self._file = None
 
     def _init(self):
-        #TODO: Can speed this up with PAG's regex header parser
+        # TODO: Can speed this up with PAG's regex header parser
         self._file = self._path.open('rb')
         version = npformat.read_magic(self._file)
         _, _, dtype = npformat._read_array_header(self._file, version)
@@ -97,6 +103,7 @@ class FileReader:
     def close(self):
         self._file.close()
         self._file = None
+
 
 class Reader:
 
@@ -122,7 +129,7 @@ class Reader:
 
 def test_file_write_read():
     d = {'total': 65536, 'count': 14, '_time': np.datetime64('now')}
-    
+
     paths.clear('test', 'stats')
     path = paths.path('test', 'stats', 'mean/traj-length').with_suffix('.npr')
 
@@ -133,6 +140,7 @@ def test_file_write_read():
     r = reader.read()
 
     assert len(r) == 1
+
 
 def test_write_read():
     paths.clear('test', 'stats')

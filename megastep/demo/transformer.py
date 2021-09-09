@@ -1,9 +1,11 @@
-import torch
+import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from torch import nn
 from torch.nn import functional as F
+
 from rebar import recurrence
-import matplotlib.pyplot as plt
+
 
 class PositionalEmbedding(nn.Module):
 
@@ -12,11 +14,11 @@ class PositionalEmbedding(nn.Module):
         assert d_model % 2 == 0
 
         self._lim = lim
-        inv_freq = 2*np.pi / (lim ** (torch.arange(0.0, d_model, 2.0) / d_model))
+        inv_freq = 2 * np.pi / (lim ** (torch.arange(0.0, d_model, 2.0) / d_model))
         self.register_buffer('inv_freq', inv_freq)
 
     def forward(self, pos_seq):
-        sinusoid_inp = pos_seq[..., None]*self.inv_freq
+        sinusoid_inp = pos_seq[..., None] * self.inv_freq
         return torch.cat([sinusoid_inp.sin(), sinusoid_inp.cos()], dim=-1)
 
     def _pattern(self, K, s):
@@ -30,10 +32,11 @@ class PositionalEmbedding(nn.Module):
 
     def plot_similarity(self, K=None, s=None):
         pattern = self._pattern(K, s)
-        top = (pattern[None, :]*pattern[:, None]).sum(-1)
+        top = (pattern[None, :] * pattern[:, None]).sum(-1)
         bot = pattern.pow(2).sum(-1).pow(.5)
-        plt.imshow(numpyify(top/(bot[None, :]*bot[:, None])), vmin=-1, vmax=+1, cmap=plt.cm.RdBu_r)
+        plt.imshow(numpyify(top / (bot[None, :] * bot[:, None])), vmin=-1, vmax=+1, cmap=plt.cm.RdBu_r)
         plt.colorbar()
+
 
 def rel_shift(x):
     """Explanation: https://github.com/kimiyoung/transformer-xl/issues/8#issuecomment-454458852"""
@@ -41,9 +44,10 @@ def rel_shift(x):
 
     zero_pad = x.new_zeros((T, 1) + tail)
     x_padded = torch.cat([zero_pad, x], dim=1)
-    x_padded = x_padded.view((C+1, T) + tail)
+    x_padded = x_padded.view((C + 1, T) + tail)
 
     return x_padded[1:].view_as(x)
+
 
 class ResetMasker(nn.Module):
 
@@ -68,14 +72,16 @@ class ResetMasker(nn.Module):
         T = reset.size(0)
         return cols[-T:]
 
+
 def attention_mask(T, M, mem_len, device=None, future=0):
-    all_ones = torch.ones((T, M+T), dtype=torch.uint8, device=device)
-    mask_len = M+T - mem_len
+    all_ones = torch.ones((T, M + T), dtype=torch.uint8, device=device)
+    mask_len = M + T - mem_len
     mask_shift_len = (T - mask_len) if mask_len > 0 else T
-    future_mask = torch.triu(all_ones, M+future)
+    future_mask = torch.triu(all_ones, M + future)
     history_mask = torch.tril(all_ones, -mask_shift_len)
     default_mask = (future_mask + history_mask)[:, :, None].bool()
     return default_mask
+
 
 class Weights(nn.Module):
 
@@ -86,7 +92,7 @@ class Weights(nn.Module):
         self.d_model = d_model
         self.mem_len = mem_len
         self.n_head = n_head
-        self.d_head = (d_head or d_model//self.n_head)
+        self.d_head = (d_head or d_model // self.n_head)
         self.content = content
         self.position = position
         self.memory = memory
@@ -95,17 +101,17 @@ class Weights(nn.Module):
         self.masker = ResetMasker(self.mem_len)
 
         self.norm = nn.LayerNorm(d_model) if norm else lambda x: x
-        self.q = nn.Linear(d_model, self.n_head*self.d_head, bias=False)
+        self.q = nn.Linear(d_model, self.n_head * self.d_head, bias=False)
 
         # Doesn't really matter how we initialize; LayerNorm will stop things from blowing up
         if self.content:
-            self.k = nn.Linear(d_model, self.n_head*self.d_head, bias=False)
+            self.k = nn.Linear(d_model, self.n_head * self.d_head, bias=False)
             self.k_bias = nn.Parameter(torch.empty((self.n_head, self.d_head)))
             torch.nn.init.normal_(self.k_bias, 0, 1)
 
         if self.position:
             self.pos_emb = PositionalEmbedding(self.d_model)
-            self.r = nn.Linear(d_model, self.n_head*self.d_head, bias=False)
+            self.r = nn.Linear(d_model, self.n_head * self.d_head, bias=False)
             self.r_bias = nn.Parameter(torch.empty((self.n_head, self.d_head)))
             torch.nn.init.normal_(self.r_bias, 0, 1)
 
@@ -117,7 +123,7 @@ class Weights(nn.Module):
         if self.memory:
             self.m.set(torch.cat([m, h])[-self.mem_len:].detach())
         M = m.size(0)
-        TM = T+M
+        TM = T + M
 
         reset = torch.zeros((T, B), dtype=torch.bool, device=h.device) if reset is None else reset
         mask = self.masker(reset).permute(0, 2, 1)[:, -TM:]
@@ -143,14 +149,15 @@ class Weights(nn.Module):
 
         #### compute attention probability
         score = (score
-                        .div(self.d_head**.5)
-                        .masked_fill(mask, -65000) # -65k is a very, very small number for a 16-bit float
-                        .clamp(-65000, +65000)) # Clamp to suppress any infs that sometimes overflow when using 16-bit floats
+                 .div(self.d_head ** .5)
+                 .masked_fill(mask, -65000)  # -65k is a very, very small number for a 16-bit float
+                 .clamp(-65000, +65000))  # Clamp to suppress any infs that sometimes overflow when using 16-bit floats
 
         prob = F.softmax(score, dim=1)
 
         # Zero any output rows where the mask was all true
         return prob.where(~mask.all(1, keepdim=True), torch.zeros_like(prob))
+
 
 class Values(nn.Module):
 
@@ -162,20 +169,20 @@ class Values(nn.Module):
         self.n_head = self.weights.n_head
         self.d_head = self.weights.d_head
         self.mem_len = self.weights.mem_len
-        
+
         self.norm = nn.LayerNorm(self.d_model)
 
-        self.v = nn.Linear(self.d_model, self.n_head*self.d_head, bias=False)
-        self.o = nn.Linear(self.n_head*self.d_head, self.d_model, bias=False)
+        self.v = nn.Linear(self.d_model, self.n_head * self.d_head, bias=False)
+        self.o = nn.Linear(self.n_head * self.d_head, self.d_model, bias=False)
 
     def forward(self, h, reset=None):
         NH, DH = self.n_head, self.d_head
         T, B = h.shape[:2]
 
-        #TODO: Cache the qkv values rather than the h values?
+        # TODO: Cache the qkv values rather than the h values?
         m = self.weights.m.get(lambda: h.new_zeros((0, B, self.d_model)))
         M = m.size(0)
-        TM = T+M
+        TM = T + M
 
         cat = self.norm(torch.cat([m, h], 0))
         v = self.v(cat).view(TM, B, NH, DH)
@@ -183,26 +190,28 @@ class Values(nn.Module):
         weights = self.weights(h, reset)
         summary = torch.einsum('ijbn,jbnd->ibnd', weights, v)
 
-        return F.relu(self.o(summary.reshape(T, B, NH*DH)))
+        return F.relu(self.o(summary.reshape(T, B, NH * DH)))
+
 
 class Gate(nn.Module):
 
     def __init__(self, d_model, bias=2.):
         super().__init__()
-        self.W = nn.Linear(d_model, 3*d_model, bias=False)
-        self.U = nn.Linear(d_model, 2*d_model, bias=False)
+        self.W = nn.Linear(d_model, 3 * d_model, bias=False)
+        self.U = nn.Linear(d_model, 2 * d_model, bias=False)
         self.Ug = nn.Linear(d_model, d_model, bias=False)
         self.b = nn.Parameter(torch.full((d_model,), bias))
 
     def forward(self, x, y):
         wr, wz, wg = torch.chunk(self.W(y), 3, dim=-1)
-        ur, uz  = torch.chunk(self.U(y), 2, dim=-1)
+        ur, uz = torch.chunk(self.U(y), 2, dim=-1)
 
         r = torch.sigmoid(wr + ur)
         z = torch.sigmoid(wz + uz - self.b)
-        h = torch.tanh(wg + self.Ug(r*x))
+        h = torch.tanh(wg + self.Ug(r * x))
 
-        return (1 - z)*x + z*h
+        return (1 - z) * x + z * h
+
 
 class GatedAttention(nn.Module):
     def __init__(self, **kwargs):
@@ -220,6 +229,7 @@ class GatedAttention(nn.Module):
         a = self.attn(h, reset)
         h = self.attn_gate(h, a)
         return self.ff_gate(h, self.ff(h))
+
 
 class Transformer(nn.Module):
 
@@ -244,6 +254,7 @@ def test_weights_simple():
     attn(h)
     attn(h)
 
+
 def test_weights_content_single():
     h = torch.tensor([10, 0, 10])[:, None, None].float()
 
@@ -256,9 +267,10 @@ def test_weights_content_single():
     w = torch.tensor([[0, 0, 0], [1, 0, 0], [1, 0, 0]]).float()
     torch.testing.assert_allclose(w, what[:, :, 0, 0])
 
+
 def test_weights_content_multi():
     h0 = torch.tensor([10, 0])[:, None, None].float()
-    h1 = torch.tensor([10,])[:, None, None].float()
+    h1 = torch.tensor([10, ])[:, None, None].float()
 
     attn = Weights(3, 1, position=False, norm=False)
     attn.k.weight[:] = +1.
@@ -271,12 +283,14 @@ def test_weights_content_multi():
     w = torch.tensor([[1, 0, 0]]).float()
     torch.testing.assert_allclose(w, what[:, :, 0, 0])
 
+
 def test_values_simple():
     T, B, K = 5, 7, 2
     h = torch.rand((T, B, K))
     attn = Values(T, K)
     attn(h)
     attn(h)
+
 
 def test_reset():
     h = torch.rand((8, 1, 2))

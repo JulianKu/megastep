@@ -1,8 +1,10 @@
-import signal
-from .contextlib import maybeasynccontextmanager
 import logging
+import signal
+
+from .contextlib import maybeasynccontextmanager
 
 log = logging.getLogger(__name__)
+
 
 class Interrupter:
 
@@ -21,7 +23,9 @@ class Interrupter:
     def reset(self):
         self._is_set = False
 
+
 _INTERRUPTER = Interrupter()
+
 
 @maybeasynccontextmanager
 def interrupter():

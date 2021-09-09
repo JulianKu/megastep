@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
+
 from setuptools import find_packages
 
 setup(
@@ -21,8 +22,8 @@ setup(
         'ninja>=1.10'],
     extras_require={
         'cubicasa': [
-            'beautifulsoup4>=4', 
-            'shapely>=1.7', 
+            'beautifulsoup4>=4',
+            'shapely>=1.7',
             'rasterio>=1.1',
             'pandas>=1'],
         'rebar': [

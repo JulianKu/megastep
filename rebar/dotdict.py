@@ -4,13 +4,14 @@ from functools import wraps
 SCREEN_WIDTH = 119
 SCREEN_HEIGHT = 200
 
+
 class dotdict(OrderedDict):
     """dotdicts are dictionaries with additional support for attribute (dot) access of their elements.
     dotdicts have a lot of unusual but extremely useful behaviours, which are documented in :ref:`the dotdicts
     and arrdicts concept section <dotdicts>` .
 
     """
-    
+
     def __dir__(self):
         return sorted(set(super().__dir__() + list(self.keys())))
 
@@ -21,14 +22,15 @@ class dotdict(OrderedDict):
             try:
                 return type(self)([(k, getattr(v, key)) for k, v in self.items()])
             except AttributeError:
-                raise AttributeError(f"There is no member called '{key}' and one of the leaves has no attribute '{key}'") from None
+                raise AttributeError(
+                    f"There is no member called '{key}' and one of the leaves has no attribute '{key}'") from None
 
     def __call__(self, *args, **kwargs):
         return type(self)([(k, v(*args, **kwargs)) for k, v in self.items()])
 
     def __str__(self):
         return treestr(self)
-    
+
     def __repr__(self):
         return self.__str__()
 
@@ -37,11 +39,11 @@ class dotdict(OrderedDict):
 
     def __setstate__(self, state):
         self.update(state)
-    
+
     def copy(self):
         """Shallow-copy the dotdict"""
-        return type(self)(super().copy()) 
-    
+        return type(self)(super().copy())
+
     def pipe(self, f, *args, **kwargs):
         """Returns ``f(self, *args, **kwargs)`` . 
 
@@ -81,19 +83,20 @@ class dotdict(OrderedDict):
         See :func:`starmapping` for a functional version of this method."""
         return starmapping(f)(self, *args, **kwargs)
 
+
 def treestr(t):
     """Stringifies a tree structure. These turn up all over the place in my code, so it's worth factoring out"""
     key_length = max(map(len, map(str, t.keys()))) if t.keys() else 0
     max_spaces = 4 + key_length
     val_length = SCREEN_WIDTH - max_spaces
-    
+
     d = {}
     for k, v in t.items():
         if isinstance(v, dotdict):
             d[k] = str(v)
         elif isinstance(v, (list, set, dict)):
             d[k] = f'{type(v).__name__}({len(v)},)'
-        elif hasattr(v, 'shape') and hasattr(v, 'dtype'):                    
+        elif hasattr(v, 'shape') and hasattr(v, 'dtype'):
             d[k] = f'{type(v).__name__}({tuple(v.shape)}, {v.dtype})'
         elif hasattr(v, 'shape'):
             d[k] = f'{type(v).__name__}({tuple(v.shape)})'
@@ -107,14 +110,15 @@ def treestr(t):
     s = [f'{type(t).__name__}:']
     for k, v in d.items():
         lines = v.splitlines() or ['']
-        s.append(str(k) + ' '*(max_spaces - len(str(k))) + lines[0])
+        s.append(str(k) + ' ' * (max_spaces - len(str(k))) + lines[0])
         for l in lines[1:]:
-            s.append(' '*max_spaces + l)
-        if len(s) >= SCREEN_HEIGHT-1:
+            s.append(' ' * max_spaces + l)
+        if len(s) >= SCREEN_HEIGHT - 1:
             s.append('...')
             break
 
     return '\n'.join(s)
+
 
 def mapping(f):
     """Wraps ``f`` so that when called on a dotdict, ``f`` instead gets called on the dotdict's values
@@ -142,7 +146,9 @@ def mapping(f):
         if isinstance(f, str):
             return getattr(x, f)(*args, **kwargs)
         return f(x, *args, **kwargs)
+
     return g
+
 
 def starmapping(f):
     """Wraps ``f`` so that when called on a sequence of dotdicts, ``f`` instead gets called on the dotdict's values
@@ -161,6 +167,7 @@ def starmapping(f):
 
     See :func:`dotdict.starmap` for an object-oriented version of this function.
     """
+
     @wraps(f)
     def g(x, *args, **kwargs):
         if isinstance(x, dict):
@@ -169,7 +176,9 @@ def starmapping(f):
             return getattr(x, f)(*args)
         else:
             return f(x, *args)
+
     return g
+
 
 def leaves(t):
     """Returns the leaves of a tree of dotdicts as a list"""

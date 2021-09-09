@@ -1,24 +1,23 @@
-from torch import distributed as dist
-import torch
-import os
-import signal
 import asyncio
-from functools import wraps
+import inspect
+import logging
+import os
+import time
+from contextlib import contextmanager
+
+import torch
+from torch import distributed as dist
 from torch import multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
-from contextlib import contextmanager
 from torch.nn.parallel.distributed import _find_tensors
-from .contextlib import maybeasynccontextmanager
-import logging
-import inspect
-import time
 
 log = logging.getLogger(__name__)
+
 
 def initialize(device, devices):
     if dist.is_initialized():
         log.info('Process group is already initialized')
-        return 
+        return
 
     os.environ['MASTER_ADDR'] = '127.0.0.1'
     if device is None:
@@ -28,6 +27,7 @@ def initialize(device, devices):
         os.environ['MASTER_PORT'] = str(29500 + devices[0])
         dist.init_process_group('nccl', rank=devices.index(device), world_size=len(devices))
 
+
 @contextmanager
 def processgroup(device, devices):
     try:
@@ -35,6 +35,7 @@ def processgroup(device, devices):
         yield
     finally:
         dist.destroy_process_group()
+
 
 class DDP2(DDP):
 
@@ -69,10 +70,10 @@ class DDP2(DDP):
 
         return output
 
+
 def set_start_method():
     """If you use get_start_method to check what the start method is, you'll accidentally _set_ the start method
     and then get an error if you later try to set it. Here we open the box without killing the cat"""
-    import os
 
     # https://github.com/pytorch/pytorch/issues/32575
     # os.environ['NCCL_BLOCKING_WAIT'] = '1'
@@ -84,10 +85,12 @@ def set_start_method():
     else:
         assert ctx._actual_context._name in ('spawn', 'forkserver')
 
+
 def consensus(b):
     b = torch.tensor(float(b)).cuda()
     dist.all_reduce(b, dist.ReduceOp.PRODUCT)
     return bool(b.cpu())
+
 
 def cancel(canceller):
     if dist.is_initialized():
@@ -104,12 +107,14 @@ def cancel(canceller):
             log.info('Cancelled, breaking')
             return True
 
+
 async def surrender():
     await asyncio.sleep(0)
 
 
 class DeadStrand(Exception):
     pass
+
 
 def coroutine_runner(f, *args, **kwargs):
     co = f(*args, **kwargs)
@@ -172,7 +177,7 @@ class ProcessSentinel:
         else:
             for n, c in alive:
                 log.info(f'Failed to cancel "{n}-{c}"; terminating')
-                self._processes[n].terminate() 
+                self._processes[n].terminate()
 
         self._references = []
 
@@ -187,6 +192,7 @@ class ProcessSentinel:
                 log.info(f'Process "{n}-{c}" died unexpectedly; cancelling')
                 self.cancel()
                 raise DeadStrand(f'Process "{n}-{c}" died unexpectedly')
+
 
 class SerialSentinel:
 
@@ -249,6 +255,7 @@ class SerialSentinel:
                 self.cancel()
                 raise e
 
+
 @contextmanager
 def sentinel(serial=False):
     sentinel = SerialSentinel() if serial else ProcessSentinel()
@@ -260,7 +267,7 @@ def sentinel(serial=False):
     except (DeadStrand,):
         raise
     except:
-        sentinel.cancel()  
+        sentinel.cancel()
         raise
     else:
         sentinel.cancel()

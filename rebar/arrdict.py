@@ -1,12 +1,16 @@
-from multiprocessing import Value
-import numpy as np
 from functools import partialmethod
+
+import numpy as np
+
 from . import dotdict
+
 try:
     import torch
+
     TORCH = True
 except ModuleNotFoundError:
     TORCH = False
+
 
 def _arrdict_factory():
     # This is done with a factory because I am a lazy man and I didn't fancy defining all the binary ops on 
@@ -31,7 +35,7 @@ def _arrdict_factory():
         def __setitem__(self, x, y):
             # Valid keys to stick in an arrdict are strings and tuples of strings.
             # Anything else could plausibly be a tensor index.
-            if (isinstance(x, str) or 
+            if (isinstance(x, str) or
                     (isinstance(x, tuple) and all(isinstance(xx, str) for xx in x))):
                 super().__setitem__(x, y)
             elif isinstance(y, type(self)):
@@ -52,16 +56,20 @@ def _arrdict_factory():
     # Add binary methods
     # https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
     binaries = [
-        'lt', 'le', 'eq', 'ne', 'ge', 'gt', 
-        'add', 'sub', 'mul', 'matmul', 'truediv', 'floordiv', 'mod', 'divmod', 'pow', 'lshift', 'rshift', 'and', 'or', 'xor',
-        'radd', 'rsub', 'rmul', 'rmatmul', 'rtruediv', 'rfloordiv', 'rmod', 'rdivmod', 'rpow', 'rand', 'lshift', 'rshift', 'ror', 'rxor']
+        'lt', 'le', 'eq', 'ne', 'ge', 'gt',
+        'add', 'sub', 'mul', 'matmul', 'truediv', 'floordiv', 'mod', 'divmod', 'pow', 'lshift', 'rshift', 'and', 'or',
+        'xor',
+        'radd', 'rsub', 'rmul', 'rmatmul', 'rtruediv', 'rfloordiv', 'rmod', 'rdivmod', 'rpow', 'rand', 'lshift',
+        'rshift', 'ror', 'rxor']
     methods = {f'__{name}__': partialmethod(_arrdict_base.__binary_op__, f'__{name}__') for name in binaries}
 
     methods['__doc__'] = _arrdict_base.__doc__
 
     return type('arrdict', (_arrdict_base,), methods)
 
+
 arrdict = _arrdict_factory()
+
 
 @dotdict.mapping
 def torchify(a):
@@ -87,6 +95,7 @@ def torchify(a):
         raise ValueError(f'Can\'t handle {type(a)}')
     return torch.as_tensor(np.array(a), dtype=dtype)
 
+
 @dotdict.mapping
 def numpyify(tensors):
     """Converts an array or a dict of tensors to numpy arrays.
@@ -98,6 +107,7 @@ def numpyify(tensors):
     if hasattr(tensors, 'numpyify'):
         return tensors.numpyify()
     return tensors
+
 
 def stack(x, *args, **kwargs):
     """Stacks a sequence of arrays, tensors or dicts thereof.  
@@ -121,10 +131,11 @@ def stack(x, *args, **kwargs):
     if TORCH and isinstance(x[0], torch.Tensor):
         return torch.stack(x, *args, **kwargs)
     if isinstance(x[0], np.ndarray):
-        return np.stack(x, *args, **kwargs) 
+        return np.stack(x, *args, **kwargs)
     if np.isscalar(x[0]):
         return np.array(x, *args, **kwargs)
     raise ValueError(f'Can\'t stack {type(x[0])}')
+
 
 def cat(x, *args, **kwargs):
     """Concatenates a sequence of arrays, tensors or dicts thereof.  
@@ -148,10 +159,11 @@ def cat(x, *args, **kwargs):
     if TORCH and isinstance(x[0], torch.Tensor):
         return torch.cat(x, *args, **kwargs)
     if isinstance(x[0], np.ndarray):
-        return np.concatenate(x, *args, **kwargs) 
+        return np.concatenate(x, *args, **kwargs)
     if np.isscalar(x[0]):
         return np.array(x)
     raise ValueError(f'Can\'t cat {type(x[0])}')
+
 
 @dotdict.mapping
 def clone(t):

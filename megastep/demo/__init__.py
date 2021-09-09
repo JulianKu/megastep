@@ -1,14 +1,16 @@
 """TODO-DOCS Demo docs"""
-import torch
-from megastep.demo import learning, lstm, heads
-from rebar import logging, paths, stats, widgets, storing, arrdict, dotdict, recurrence, recording
-import pandas as pd
 import numpy as np
+import pandas as pd
+import torch
 from torch import nn
 from tqdm.auto import tqdm
+
+from megastep.demo import learning, lstm, heads
 from megastep.demo.envs import explorer, deathmatch
+from rebar import logging, paths, stats, widgets, storing, arrdict, recurrence, recording
 
 log = logging.getLogger(__name__)
+
 
 class Agent(nn.Module):
 
@@ -34,6 +36,7 @@ class Agent(nn.Module):
             outputs['value'] = self.value(world.obs, reset=world.reset)
         return outputs
 
+
 def as_chunk(buffer):
     chunk = arrdict.stack(buffer)
     with stats.defer():
@@ -51,6 +54,7 @@ def as_chunk(buffer):
         stats.mean('traj-reward/negative', chunk.world.reward.clamp(None, 0).sum(), chunk.world.reset.sum())
     return chunk
 
+
 def optimize(agent, opt, batch, entropy=1e-2, gamma=.99, clip=.2):
     w, d0 = batch.world, batch.decision
     d = agent(w, value=True)
@@ -62,17 +66,17 @@ def optimize(agent, opt, batch, entropy=1e-2, gamma=.99, clip=.2):
 
     v_target = learning.v_trace(ratio, d.value, w.reward, w.reset, gamma=gamma)
     v_clipped = d0.value + torch.clamp(d.value - d0.value, -10, +10)
-    v_loss = .5*torch.max((d.value - v_target)**2, (v_clipped - v_target)**2).mean()
+    v_loss = .5 * torch.max((d.value - v_target) ** 2, (v_clipped - v_target) ** 2).mean()
 
     adv = learning.generalized_advantages(d.value, w.reward, d.value, w.reset, gamma=gamma)
-    normed_adv = (adv - adv.mean())/(1e-3 + adv.std())
-    free_adv = ratio*normed_adv
-    clip_adv = torch.clamp(ratio, 1-clip, 1+clip)*normed_adv
+    normed_adv = (adv - adv.mean()) / (1e-3 + adv.std())
+    free_adv = ratio * normed_adv
+    clip_adv = torch.clamp(ratio, 1 - clip, 1 + clip) * normed_adv
     p_loss = -torch.min(free_adv, clip_adv).mean()
 
-    h_loss = (logits.exp()*logits).sum(-1).mean()
-    loss = v_loss + p_loss + entropy*h_loss
-    
+    h_loss = (logits.exp() * logits).sum(-1).mean()
+    loss = v_loss + p_loss + entropy * h_loss
+
     opt.zero_grad()
     loss.backward()
     torch.nn.utils.clip_grad_norm_(agent.policy.parameters(), 100.)
@@ -86,8 +90,8 @@ def optimize(agent, opt, batch, entropy=1e-2, gamma=.99, clip=.2):
         stats.mean('loss/policy', p_loss)
         stats.mean('loss/entropy', h_loss)
         stats.mean('resid-var/v', (v_target - d.value).pow(2).mean(), v_target.pow(2).mean())
-        stats.mean('rel-entropy', -(logits.exp()*logits).sum(-1).mean()/np.log(logits.shape[-1]))
-        stats.mean('kl-div', kl_div) 
+        stats.mean('rel-entropy', -(logits.exp() * logits).sum(-1).mean() / np.log(logits.shape[-1]))
+        stats.mean('kl-div', kl_div)
 
         stats.mean('v-target/mean', v_target.mean())
         stats.mean('v-target/std', v_target.std())
@@ -106,10 +110,11 @@ def optimize(agent, opt, batch, entropy=1e-2, gamma=.99, clip=.2):
 
     return kl_div
 
+
 def train():
     buffer_size = 32
-    n_envs = 8*1024
-    batch_size = 16*1024
+    n_envs = 8 * 1024
+    batch_size = 16 * 1024
 
     env = explorer.Explorer(n_envs)
     agent = Agent(env).cuda()
@@ -119,7 +124,7 @@ def train():
     paths.clear(run_name)
     compositor = widgets.Compositor()
     with logging.via_dir(run_name, compositor), stats.via_dir(run_name, compositor):
-        
+
         world = env.reset()
         while True:
             buffer = []
@@ -134,7 +139,7 @@ def train():
                 log.info('actor stepped')
 
             chunk = as_chunk(buffer)
-            
+
             for idxs in learning.batch_indices(chunk, batch_size):
                 with recurrence.temp_clear_set(agent, state[:, idxs]):
                     kl = optimize(agent, opt, chunk[:, idxs])
@@ -147,8 +152,9 @@ def train():
             stats.gpu.memory(0)
             stats.gpu.vitals(0, throttle=15)
 
+
 def demo(run=-1, length=None, test=True, N=None, env=None, agent=None, d=0):
-    env = explorer.Explorer(d+1) if env is None else env
+    env = explorer.Explorer(d + 1) if env is None else env
     world = env.reset()
     if agent is None:
         agent = Agent(env).cuda()

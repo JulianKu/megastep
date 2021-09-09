@@ -1,8 +1,11 @@
+import numbers
+
 import numpy as np
 import torch
-import numbers
+
 from rebar import arrdict
 from . import cuda
+
 
 class RaggedNumpy:
 
@@ -35,9 +38,9 @@ class RaggedNumpy:
             return self.vals[self.starts[x]:self.ends[x]]
         if isinstance(x, slice):
             assert x.step in (None, 1)
-            start, end = x.start or 0, x.stop or len(self.ends) 
+            start, end = x.start or 0, x.stop or len(self.ends)
             return RaggedNumpy(
-                self.vals[self.starts[start]:self.ends[end-1]],
+                self.vals[self.starts[start]:self.ends[end - 1]],
                 self.widths[start:end])
         raise ValueError(f'Can\'t handle index "{x}"')
 
@@ -52,6 +55,7 @@ class RaggedNumpy:
 
     def __repr__(self):
         return str(self)
+
 
 def Ragged(vals, widths):
     """Returns a :ref:`Ragged <raggeds>` array or tensor. 
@@ -74,6 +78,7 @@ def Ragged(vals, widths):
     Ragged = getattr(cuda, f'Ragged{vals.ndim}D')
     return Ragged(vals, widths)
 
+
 def test_ragged():
     vals = torch.as_tensor([0, 1, 2, 3, 4, 5]).float()
     widths = torch.as_tensor([3, 1, 2]).int()
@@ -87,6 +92,7 @@ def test_ragged():
 
     torch.testing.assert_allclose(ragged[1:].vals, np.array([3, 4, 5]))
     torch.testing.assert_allclose(ragged[1:].widths, np.array([1, 2]))
+
 
 def test_ragged_numpy():
     vals = np.array([0, 1, 2, 3, 4, 5])

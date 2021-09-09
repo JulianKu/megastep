@@ -1,8 +1,10 @@
 """TODO-DOCS LSTM docs"""
 import torch
 from torch import nn
-from rebar import recurrence, dotdict
 from torch.nn.utils.rnn import PackedSequence
+
+from rebar import recurrence
+
 
 class Packer:
 
@@ -14,7 +16,7 @@ class Packer:
 
         idxs = ext.nonzero().squeeze(-1)
 
-        b = ext.cumsum(0)-1
+        b = ext.cumsum(0) - 1
         t = torch.arange(len(ext), device=idxs.device) - idxs[b]
 
         ends = torch.cat([idxs, torch.full_like(idxs[:1], len(b))])
@@ -22,13 +24,13 @@ class Packer:
 
         T = reset.size(0)
         B = len(idxs)
-        L = T+1
-        assert T**2 * B < 2**32 - 1
+        L = T + 1
+        assert T ** 2 * B < 2 ** 32 - 1
 
         self._b = b
         self._t = t
-        self._order = torch.argsort(t*B*L + b*L + (L-l[b]-1))
-        self._sizes = torch.flip(torch.flip(torch.histc(l-1, l.max(), 0, l.max()), (0,)).cumsum(0), (0,))
+        self._order = torch.argsort(t * B * L + b * L + (L - l[b] - 1))
+        self._sizes = torch.flip(torch.flip(torch.histc(l - 1, l.max(), 0, l.max()), (0,)).cumsum(0), (0,))
 
     def pack_data(self, x):
         vals = x.transpose(0, 1).reshape(-1, *x.shape[2:])[self._order]
@@ -47,14 +49,14 @@ class Packer:
 
     def unpack_data(self, xp):
         T, B = self._reset.shape
-        x = xp.data.new_zeros(T*B, *xp.data.shape[1:])
+        x = xp.data.new_zeros(T * B, *xp.data.shape[1:])
         x[self._order] = xp.data
         return x.reshape(B, T, *xp.data.shape[1:]).transpose(0, 1)
 
     def unpack_state(self, hp):
         T, B = self._reset.shape
-        mask = (self._order % T == T-1)
-        left_idxs = (self._order//T)[mask]
+        mask = (self._order % T == T - 1)
+        left_idxs = (self._order // T)[mask]
         right_idxs = self._b[self._order][mask]
 
         h = hp.new_zeros((1, B, *hp.shape[2:]))
@@ -117,4 +119,3 @@ def test_packer():
 
     torch.testing.assert_allclose(hp, torch.tensor([1, 0, 3, 0, 4, 0]).float().cuda())
     torch.testing.assert_allclose(hu, torch.tensor([[1, 0, 0, 0]]).float().cuda())
-

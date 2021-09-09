@@ -1,10 +1,10 @@
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import rasterio.features
-from shapely.ops import cascaded_union
-from shapely.geometry import Polygon, LineString
 from bs4 import BeautifulSoup
+from shapely.geometry import Polygon, LineString
+from shapely.ops import cascaded_union
 
 MARGIN = 1.
 RES = .2
@@ -12,19 +12,23 @@ SCALE = 100
 
 from itertools import islice, cycle
 
+
 def cyclic_pairs(xs):
     """Returns pairs ``(xs[i], xs[i+1])``, wrapping the last pair round to the start."""
     ys = islice(cycle(xs), 1, None)
     return list(zip(xs, ys))
 
+
 def signed_area(points):
     area = 0
     for x, y in cyclic_pairs(points):
-        area += x[0]*y[1] - x[1]*y[0]
+        area += x[0] * y[1] - x[1] * y[0]
     return area
+
 
 def polypoints(svgpoly):
     return np.array([list(map(float, p.split(','))) for p in svgpoly.attrs['points'].split()])
+
 
 def orient(points):
     if signed_area(points) > 0:
@@ -32,13 +36,15 @@ def orient(points):
     else:
         return points[::-1]
 
+
 def unique(walls):
     """Eliminate walls that are copies of other walls"""
-    forward  = ((walls[:, None, :, :] - walls[None, :, ::+1, :])**2).sum(-1).sum(-1)**.5
-    backward = ((walls[:, None, :, :] - walls[None, :, ::-1, :])**2).sum(-1).sum(-1)**.5
+    forward = ((walls[:, None, :, :] - walls[None, :, ::+1, :]) ** 2).sum(-1).sum(-1) ** .5
+    backward = ((walls[:, None, :, :] - walls[None, :, ::-1, :]) ** 2).sum(-1).sum(-1) ** .5
     mask = (forward < 1e-3) | (backward < 1e-3)
     mask[np.triu_indices_from(mask)] = False
     return walls[~mask.any(1)]
+
 
 def svg_walls(soup):
     walls = cascaded_union([Polygon(polypoints(wall)) for wall in soup.select('.Wall>polygon')])
@@ -53,11 +59,13 @@ def svg_walls(soup):
     walls = np.concatenate([cyclic_pairs(t) for t in tops])
 
     # Zero-length walls cause various warnings upstream. May as well get rid of them now. 
-    lengths = ((walls[:, 0] - walls[:, 1])**2).sum(1)**.5
+    lengths = ((walls[:, 0] - walls[:, 1]) ** 2).sum(1) ** .5
     return unique(walls[lengths > 0])
+
 
 def svg_spaces(soup):
     return [polypoints(poly) for poly in soup.select('.Space>polygon')]
+
 
 def transform(walls, spaces):
     """svg coords are in centimeters from the (left, top) corner, 
@@ -67,16 +75,18 @@ def transform(walls, spaces):
 
     def tr(ps):
         x, y = ps[..., 0], ps[..., 1]
-        return np.stack([x - left, bot - y], -1)/SCALE + MARGIN
-    
+        return np.stack([x - left, bot - y], -1) / SCALE + MARGIN
+
     return tr(walls), [tr(s) for s in spaces]
+
 
 def mask_transform(*args):
     points = np.concatenate([np.concatenate(a) for a in args])
     assert np.concatenate(points).min() > 0, 'Masker currently requires the points to be in the top-right quadrant'
     r, t = points.max(0) + MARGIN
-    h, w = int(t/RES)+1, int(r/RES)+1
-    return rasterio.transform.Affine(RES, 0, 0, 0, -RES, h*RES), (h, w)
+    h, w = int(t / RES) + 1, int(r / RES) + 1
+    return rasterio.transform.Affine(RES, 0, 0, 0, -RES, h * RES), (h, w)
+
 
 def masks(walls, spaces, res=RES):
     """Generates a masking array from an array of walls and a list of spaces.
@@ -88,13 +98,15 @@ def masks(walls, spaces, res=RES):
     """
     transform, shape = mask_transform(walls, spaces)
     wall_shapes = [(cascaded_union([LineString(p).buffer(.01) for p in walls]), -1)]
-    space_shapes = [(Polygon(p).buffer(0), i+1) for i, p in enumerate(spaces)]
+    space_shapes = [(Polygon(p).buffer(0), i + 1) for i, p in enumerate(spaces)]
     shapes = [(s, v) for (s, v) in space_shapes + wall_shapes if not s.is_empty]
     return rasterio.features.rasterize(shapes, shape, transform=transform, all_touched=True, dtype=np.int16)
+
 
 def centroids(spaces):
     # Reshape needed for the case there are no lights
     return np.array([Polygon(ps).centroid.coords[0] for ps in spaces]).reshape(-1, 2)
+
 
 def geometry(svg):
     soup = BeautifulSoup(svg, features='lxml')
@@ -107,6 +119,7 @@ def geometry(svg):
         masks=masks(walls, spaces),
         res=RES)
 
+
 def centers(indices, shape, res):
     """Converts mask (i, j) indices to the (x, y) coordinates of the ``ij`` th cell's center.
 
@@ -118,8 +131,9 @@ def centers(indices, shape, res):
     :return: A (..., 2) array of (x, y) coordinates
     """
     i, j = indices[..., 0] + .5, indices[..., 1] + .5
-    xy = res*np.stack([j, shape[0] - i], -1)
+    xy = res * np.stack([j, shape[0] - i], -1)
     return xy
+
 
 def indices(coords, shape, res):
     """Converts (x, y) coordinates to the (i, j) indices of the containing cell.
@@ -132,9 +146,10 @@ def indices(coords, shape, res):
     :return: A (..., 2) array of integer (i, j) indices.
     """
     x, y = coords[..., 0], coords[..., 1]
-    i = (shape[0] - y/res).clip(0, shape[0]-1)
-    j = (x/res).clip(0, shape[1]-1)
+    i = (shape[0] - y / res).clip(0, shape[0] - 1)
+    j = (x / res).clip(0, shape[1] - 1)
     return np.stack([i, j], -1).astype(int)
+
 
 def display(g):
     """Visualize a geometry using matplotlib. 
@@ -158,10 +173,10 @@ def display(g):
         ax.autoscale()
 
     if 'masks' in g:
-        height, width = g.res*np.array(g.masks.shape)
+        height, width = g.res * np.array(g.masks.shape)
         extent = (0, width, 0, height)
         cm = ax.imshow(g.masks, extent=extent, cmap='tab20')
-        ticks = np.arange(g.masks.min(), g.masks.max()+1)
+        ticks = np.arange(g.masks.min(), g.masks.max() + 1)
         plt.colorbar(cm, values=ticks, ticks=ticks)
-    
+
     return fig

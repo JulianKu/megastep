@@ -1,6 +1,9 @@
-from . import arrdict
-from torch import nn
 from contextlib import contextmanager
+
+from torch import nn
+
+from . import arrdict
+
 
 class State:
 
@@ -22,14 +25,16 @@ class State:
 
     def __repr__(self):
         return f'State({self._value})'
-    
+
     def __str__(self):
         return repr(self)
+
 
 def states(net):
     substates = {k: states(v) for k, v in net.named_children()}
     ownstates = {k: getattr(net, k) for k in dir(net) if isinstance(getattr(net, k), State)}
     return arrdict.arrdict({k: v for k, v in {**ownstates, **substates}.items() if v})
+
 
 def _nonnull(x):
     y = type(x)()
@@ -42,14 +47,18 @@ def _nonnull(x):
             y[k] = v
     return y
 
+
 def get(net):
     return _nonnull(states(net).map(lambda s: s.get()))
+
 
 def set(net, state):
     state.starmap(lambda r, n: n.set(r), states(net))
 
+
 def clear(net):
     states(net).map(lambda s: s.clear())
+
 
 @contextmanager
 def temp_clear(net):
@@ -60,6 +69,7 @@ def temp_clear(net):
     finally:
         set(net, original)
 
+
 @contextmanager
 def temp_set(net, state):
     original = get(net)
@@ -69,10 +79,12 @@ def temp_set(net, state):
     finally:
         set(net, original)
 
+
 @contextmanager
 def temp_clear_set(net, state):
     with temp_clear(net), temp_set(net, state):
         yield net
+
 
 class Sequential(nn.Sequential):
 

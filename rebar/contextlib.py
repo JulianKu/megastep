@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from functools import wraps
 
+
 class MaybeAsyncGeneratorContextManager:
 
     def __init__(self, func, args, kwargs):
@@ -27,15 +28,18 @@ class MaybeAsyncGeneratorContextManager:
             @asynccontextmanager
             async def asyncfunc(*args, **kwargs):
                 with contextmanager(self._func)(*args, **kwargs):
-                    yield 
+                    yield
+
             self._async = asyncfunc(*self._args, **self._kwargs)
         return self._async.__aenter__()
 
     def __aexit__(self, t, v, tb):
         return self._async.__aexit__(t, v, tb)
 
+
 def maybeasynccontextmanager(func):
     @wraps(func)
     def helper(*args, **kwds):
         return MaybeAsyncGeneratorContextManager(func, args, kwds)
+
     return helper

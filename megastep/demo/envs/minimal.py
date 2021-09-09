@@ -1,8 +1,10 @@
-from rebar import arrdict, dotdict
-from megastep import modules, core, toys, scene
-from torch import nn
-from megastep.demo import heads
 import matplotlib.pyplot as plt
+from torch import nn
+
+from megastep import modules, core, toys, scene
+from megastep.demo import heads
+from rebar import arrdict, dotdict
+
 
 class Minimal:
 
@@ -12,7 +14,7 @@ class Minimal:
         
         See :ref:`the simple environment tutorial for details <minimal-env>`."""
 
-        geometries = n_envs*[toys.box()]
+        geometries = n_envs * [toys.box()]
         scenery = scene.scenery(geometries, n_agents=1)
         self.core = core.Core(scenery)
         self.spawner = modules.RandomSpawns(geometries, self.core)
@@ -34,7 +36,7 @@ class Minimal:
         return dotdict.dotdict(
             core=self.core.state(e),
             rgb=self.rgb.state(e))
-    
+
     @classmethod
     def plot_state(self, state):
         fig = plt.figure()
@@ -51,6 +53,7 @@ class Minimal:
     def display(self, e=0):
         return self.plot_state(arrdict.numpyify(self.state(e)))
 
+
 class Agent(nn.Module):
     """A minimal agent to go with the minimal environment.
 
@@ -62,7 +65,7 @@ class Agent(nn.Module):
         self.intake = heads.intake(env.obs_space, width)
         self.output = heads.output(env.action_space, width)
         self.policy = nn.Sequential(self.intake, self.output)
-        
+
     def forward(self, world):
         logits = self.policy(world.obs)
         actions = self.output.sample(logits)

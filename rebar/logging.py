@@ -1,32 +1,31 @@
-import copy
-import logging
-import time
-from pathlib import Path
-from collections import defaultdict, deque
-import logging.handlers
-import ipywidgets as widgets
-from contextlib import contextmanager
-import psutil
-from . import widgets, paths
-from .contextlib import maybeasynccontextmanager
-import sys
-import traceback
 import _thread
+import logging
+import logging.handlers
+import sys
 import threading
-
+import time
+import traceback
+from collections import defaultdict, deque
+from contextlib import contextmanager
 # for re-export
 from logging import getLogger
 
+import ipywidgets as widgets
+
+from . import widgets, paths
+from .contextlib import maybeasynccontextmanager
+
 log = getLogger(__name__)
 
-#TODO: This shouldn't be at the top level
+# TODO: This shouldn't be at the top level
 logging.basicConfig(
-            stream=sys.stdout, 
-            level=logging.INFO, 
-            format='%(asctime)s %(levelname)s %(name)s: %(message)s', 
-            datefmt=r'%Y-%m-%d %H:%M:%S')
+    stream=sys.stdout,
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(name)s: %(message)s',
+    datefmt=r'%Y-%m-%d %H:%M:%S')
 logging.getLogger('parso').setLevel('WARN')  # Jupyter's autocomplete spams the output if this isn't set
 log.info('Set log params')
+
 
 def in_ipython():
     try:
@@ -34,6 +33,7 @@ def in_ipython():
         return True
     except NameError:
         return False
+
 
 class StdoutRenderer:
 
@@ -47,6 +47,7 @@ class StdoutRenderer:
     def close(self):
         pass
 
+
 class IPythonRenderer:
 
     def __init__(self, compositor=None):
@@ -54,10 +55,10 @@ class IPythonRenderer:
         self._out = (compositor or widgets.Compositor()).output()
         self._next = time.time()
         self._lasts = {}
-        self._buffers = defaultdict(lambda: deque(['']*self._out.lines, maxlen=self._out.lines))
+        self._buffers = defaultdict(lambda: deque([''] * self._out.lines, maxlen=self._out.lines))
 
     def _format_block(self, name):
-        n_lines = max(self._out.lines//(len(self._buffers) + 2), 1)
+        n_lines = max(self._out.lines // (len(self._buffers) + 2), 1)
         lines = '\n'.join(list(self._buffers[name])[-n_lines:])
         return f'{name}:\n{lines}'
 
@@ -75,12 +76,13 @@ class IPythonRenderer:
         self._buffers[source].append(line)
         self._lasts[source] = time.time()
         self._display()
-    
+
     def close(self):
         self._display(force=True)
         # Want to leave the outputs open so you can see the final messages
         # self._out.close()
         super().close()
+
 
 @contextmanager
 def handlers(*new_handlers):
@@ -88,7 +90,7 @@ def handlers(*new_handlers):
     old_handlers = [*logger.handlers]
     try:
         logger.handlers = new_handlers
-        yield 
+        yield
     finally:
         for h in new_handlers:
             try:
@@ -102,13 +104,14 @@ def handlers(*new_handlers):
 
         logger.handlers = old_handlers
 
+
 @maybeasynccontextmanager
 def to_dir(run_name):
     path = paths.path(run_name, 'logs').with_suffix('.txt')
     handler = logging.FileHandler(path)
     handler.setLevel(logging.INFO)
     handler.setFormatter(logging.Formatter(
-        fmt='%(asctime)s %(levelname)s %(name)s: %(message)s', 
+        fmt='%(asctime)s %(levelname)s %(name)s: %(message)s',
         datefmt=r'%H:%M:%S'))
 
     with handlers(handler):
@@ -117,6 +120,7 @@ def to_dir(run_name):
         except:
             log.info(f'Trace:\n{traceback.format_exc()}')
             raise
+
 
 class Reader:
 
@@ -128,10 +132,11 @@ class Reader:
         for path in self._dir.glob('*.txt'):
             if path not in self._files:
                 self._files[path] = path.open('r')
-        
+
         for path, f in self._files.items():
             for line in f.readlines():
                 yield path, line.rstrip('\n')
+
 
 def __from_dir(canceller, renderer, reader):
     while True:
@@ -143,6 +148,7 @@ def __from_dir(canceller, renderer, reader):
 
         time.sleep(.01)
 
+
 def _from_dir(canceller, renderer, reader):
     try:
         __from_dir(canceller, renderer, reader)
@@ -150,6 +156,7 @@ def _from_dir(canceller, renderer, reader):
         log.info('Interrupting main')
         _thread.interrupt_main()
         __from_dir(canceller, renderer, reader)
+
 
 @contextmanager
 def from_dir(run_name, compositor=None):
@@ -175,10 +182,12 @@ def from_dir(run_name, compositor=None):
             else:
                 log.info('Log forwarding thread cancelled')
 
+
 @contextmanager
 def via_dir(run_name, compositor=None):
     with to_dir(run_name), from_dir(run_name, compositor):
         yield
+
 
 ### TESTS
 
@@ -190,11 +199,13 @@ def test_in_process():
             log.info('hello')
             time.sleep(.1)
 
+
 def _test_multiprocess(run_name):
     with to_file(run_name):
         for i in range(10):
             log.info(str(i))
             time.sleep(.5)
+
 
 def test_multiprocess():
     paths.clear('test', 'logs')
@@ -210,11 +221,13 @@ def test_multiprocess():
         while any(p.is_alive() for p in ps):
             time.sleep(.5)
 
+
 def _test_error(run_name):
     with to_file(run_name):
         log.info('Alive')
         time.sleep(2)
         raise ValueError('Last gasp')
+
 
 def test_error():
     paths.clear('test', 'logs')

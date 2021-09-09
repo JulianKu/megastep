@@ -1,7 +1,10 @@
-import pandas as pd
 import pickle
-from . import paths
 import time
+
+import pandas as pd
+
+from . import paths
+
 
 def store_latest(run_name, objs, throttle=0):
     path = paths.path(run_name, 'storing').with_suffix('.pkl')
@@ -16,8 +19,10 @@ def store_latest(run_name, objs, throttle=0):
 
     return True
 
+
 def runs():
     return paths.runs()
+
 
 def stored(run_name=-1):
     ps = paths.subdirectory(run_name, 'storing').glob('*.pkl')
@@ -28,6 +33,7 @@ def stored(run_name=-1):
             'path': p})
 
     return pd.DataFrame(infos)
+
 
 def load(run_name=-1, procname='MainProcess'):
     path = stored(run_name).loc[lambda df: df.procname == procname].iloc[-1].path

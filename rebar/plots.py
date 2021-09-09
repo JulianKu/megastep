@@ -1,24 +1,27 @@
 import time
+from itertools import cycle
+
 import numpy as np
 import pandas as pd
-from bokeh import plotting as bop, io as boi
-from bokeh import models as bom, events as boe, layouts as bol
-from bokeh.palettes import Category10_10
-from itertools import cycle
-from . import stats, paths
-from contextlib import contextmanager
 from IPython.display import clear_output
+from bokeh import models as bom, events as boe, layouts as bol
+from bokeh import plotting as bop, io as boi
+from bokeh.palettes import Category10_10
+
+from . import stats
 
 bop.output_notebook(hide_banner=True)
+
 
 def array(fig):
     fig.canvas.draw_idle()
     renderer = fig.canvas.get_renderer()
     w, h = int(renderer.width), int(renderer.height)
     return (np.frombuffer(renderer.buffer_rgba(), np.uint8)
-                        .reshape((h, w, 4))
-                        [:, :, :3]
-                        .copy())
+            .reshape((h, w, 4))
+            [:, :, :3]
+            .copy())
+
 
 def timedelta_xaxis(f):
     f.xaxis.ticker = bom.tickers.DatetimeTicker()
@@ -85,6 +88,7 @@ def timedelta_xaxis(f):
         }
     """)
 
+
 def suffix_yaxis(f):
     f.yaxis.formatter = bom.FuncTickFormatter(code="""
         var min_diff = Infinity;
@@ -116,8 +120,10 @@ def suffix_yaxis(f):
         }
     """)
 
+
 def x_zeroline(f):
     f.add_layout(bom.Span(location=0, dimension='height'))
+
 
 def default_tools(f):
     f.toolbar_location = None
@@ -125,15 +131,17 @@ def default_tools(f):
     # f.toolbar.active_scroll = f.select_one(bom.WheelZoomTool)
     # f.toolbar.active_inspect = f.select_one(bom.HoverTool)
     f.js_on_event(
-        boe.DoubleTap, 
+        boe.DoubleTap,
         bom.callbacks.CustomJS(args=dict(p=f), code='p.reset.emit()'))
+
 
 def styling(f):
     timedelta_xaxis(f)
     suffix_yaxis(f)
 
+
 def _timeseries(source, x, y):
-    #TODO: Work out how to apply the axes formatters to the tooltips
+    # TODO: Work out how to apply the axes formatters to the tooltips
     f = bop.figure(x_range=bom.DataRange1d(start=0, follow='end'), tooltips=[('', '$data_y')])
     f.line(x=x, y=y, source=source)
     default_tools(f)
@@ -142,9 +150,11 @@ def _timeseries(source, x, y):
 
     return f
 
+
 def timeseries(s):
     source = bom.ColumnDataSource(s.reset_index())
     return _timeseries(source, s.index.name, s.name)
+
 
 def _timedataframe(source, x, ys):
     f = bop.figure(x_range=bom.DataRange1d(start=0, follow='end'), tooltips=[('', '$data_y')])
@@ -166,9 +176,11 @@ def _timedataframe(source, x, ys):
 
     return f
 
+
 def timedataframe(df):
     source = bom.ColumnDataSource(df.reset_index())
     return _timedataframe(source, df.index.name, df.columns)
+
 
 def timegroups(df):
     tags = df.columns.str.extract(r'^(?P<chart1>.*)/(?P<label>.*)|(?P<chart2>.*)$')
@@ -219,8 +231,9 @@ class Stream:
             threshold = len(self._source.data['time'])
             new = df.iloc[threshold:]
             self._source.stream(new.reset_index())
-        
+
         boi.push_notebook(handle=self._handle)
+
 
 def view(run_name=-1, prefix='', rule='60s'):
     stream = Stream(run_name, prefix)
@@ -228,9 +241,11 @@ def view(run_name=-1, prefix='', rule='60s'):
         stream.update(rule=rule)
         time.sleep(1)
 
+
 def review(run_name=-1, prefix='', rule='60s'):
     stream = Stream(run_name, prefix)
     stream.update(rule=rule)
+
 
 def test_stream():
     times = pd.TimedeltaIndex([0, 60e3, 120e3])
@@ -243,4 +258,3 @@ def test_stream():
     for df in dfs:
         stream.update(df)
         time.sleep(1)
-    

@@ -1,16 +1,16 @@
-import time
-import torch
-from torch import multiprocessing as mp
-import queue
-from contextlib import contextmanager, asynccontextmanager
-import traceback
 import asyncio
-from functools import wraps
-from torch import nn
 import logging
+import queue
+import time
+import traceback
+from contextlib import asynccontextmanager
+
+from torch import multiprocessing as mp
+
 from . import dotdict
 
 log = logging.getLogger(__name__)
+
 
 class SerialQueue:
 
@@ -32,7 +32,7 @@ class SerialQueue:
                 return item
         else:
             return None
-    
+
     def put(self, item):
         # Not safe to test `in` directly since `item` is likely to be a tensor
         if isinstance(item, (str, type(None))) and (item in ('__END__', None)):
@@ -58,12 +58,13 @@ class SerialQueue:
     def get_end(self):
         self.get()
         return self._got_end
-        
+
     def join(self, timeout=None):
         if len(self._queue) == 0:
             return True
         else:
             return False
+
 
 class MultiprocessQueue:
 
@@ -85,7 +86,7 @@ class MultiprocessQueue:
                 return item
         except queue.Empty:
             return None
-    
+
     def put(self, item):
         # Not safe to test `in` directly since `item` is likely to be a tensor
         if isinstance(item, (str, type(None))) and (item in ('__END__', None)):
@@ -109,7 +110,7 @@ class MultiprocessQueue:
     def get_end(self):
         self.get()
         return self._got_end
-        
+
     def join(self, timeout=None):
         try:
             with self.queue._cond:
@@ -118,6 +119,7 @@ class MultiprocessQueue:
             return True
         except RuntimeError:
             return False
+
 
 async def close(intakes, outputs, timeout=5):
     """Strategy:
@@ -131,17 +133,17 @@ async def close(intakes, outputs, timeout=5):
         # Avoid a deadlock where everyone's queues are full so ENDs can't be sent
         for intake in intakes:
             intake.get()
-        
+
         if all(o.put_end() for o in outputs):
             break
         if time.time() > cutoff:
             log.warn('Timed out while waiting to send ENDs')
-            return 
+            return
 
-        # We're not actually running in a proper scheduler here, so can't sleep via it
+            # We're not actually running in a proper scheduler here, so can't sleep via it
         await asyncio.sleep(0)
         time.sleep(.1)
-    
+
     log.info(f'Sent ENDs to outputs; waiting to get ENDs from intakes')
     while True:
         if all(i.get_end() for i in intakes):
@@ -168,6 +170,7 @@ async def close(intakes, outputs, timeout=5):
 
     log.info('Outputs drained.')
 
+
 def create(x, serial=False):
     if isinstance(x, dict):
         return dotdict.dotdict({n: create(v, serial) for n, v in x.items()})
@@ -176,6 +179,7 @@ def create(x, serial=False):
     elif isinstance(x, str):
         return SerialQueue() if serial else MultiprocessQueue()
     raise ValueError(f'Can\'t handle {type(x)}')
+
 
 @asynccontextmanager
 async def cleanup(intakes, outputs):
@@ -188,4 +192,3 @@ async def cleanup(intakes, outputs):
         raise
     finally:
         await close(intakes, outputs)
-
