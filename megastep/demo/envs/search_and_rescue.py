@@ -70,8 +70,9 @@ class SearchAndRescueBase:
         obj_idxs = line_idxs // len(self.core.scenery.model)
         mask = (0 <= line_idxs) & (obj_idxs >= self.n_controllable_agents) & (obj_idxs < self.n_search_objects)
         objects_in_view = obj_idxs.where(mask, torch.full_like(line_idxs, -1))
-        search_objects = torch.arange(start=self.n_controllable_agents, end=self.n_all_entities, device=self.core.device)
-        obj_in_view = (objects_in_view[:, :, None] == search_objects[None, None, :, None, None]).any(-1).squeeze()
+        search_objects = torch.arange(start=self.n_controllable_agents, end=self.n_all_entities,
+                                      device=self.core.device)
+        obj_in_view = (objects_in_view[:, :, None] == search_objects[None, None, :, None, None]).any(-1).squeeze(-1)
         new_objs_in_view = obj_in_view & torch.logical_not(self._found_search_objects)
 
         return new_objs_in_view
