@@ -311,6 +311,13 @@ class BatteryLevel:
                                                       + self._const_motion_discharge)
                                                      + self._const_non_motion_discharge)
 
+        return self._battery_level
+
+    def reset(self, reset):
+
+        self._battery_level[:, :reset.shape[1]][reset] = 1.
+
+    def get_battery_level(self):
 
         return self._battery_level
 

@@ -110,6 +110,7 @@ class SearchAndRescueBase:
 
     def _reset(self, reset=None):
         self._respawner(reset)
+        self._battery.reset(reset)
         controllable_agt_reset = reset[:, :self.n_controllable_agents]
         self._seen[controllable_agt_reset[self._tex_to_env][:, 0]] = False
         self._potential[controllable_agt_reset] = 0
@@ -131,7 +132,7 @@ class SearchAndRescueBase:
 
         self._lengths += 1
 
-        reset = (self._lengths >= self._potential + 200)
+        reset = (self._lengths >= self._potential + 200) | (self._battery.get_battery_level() <= 0)
         self._reset(reset)
         obs, reward = self._observe(reset)
         return arrdict.arrdict(
