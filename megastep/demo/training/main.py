@@ -35,6 +35,7 @@ if __name__ == '__main__':
     d = 0
 
     world = env.reset()
+    n_agents = config['ENV']['n_agents']
 
     steps = 0
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -42,7 +43,7 @@ if __name__ == '__main__':
             tqdm(total=length) as pbar:
         while True:
             decision = arrdict.arrdict(actions=torch.randint(9, size=(config['ENV']['n_envs'],
-                                                                      config['ENV']['n_agents'])))
+                                                                      n_agents)))
             world = env.step(decision)
             steps += 1
             pbar.update(1)
@@ -50,10 +51,11 @@ if __name__ == '__main__':
                 break
             state = env.state(d)
 
-            fig = env.display(0, config['ENV']['n_agents'])
-            plt.show()
+            # fig = env.display(0, n_agents, dpi=config['DISPLAY']['dpi'])
+            # plt.show()
 
-            encoder(arrdict.numpyify(arrdict.arrdict(**state, decision=decision)), config['ENV']['n_agents'])
+            encoder(arrdict.numpyify(arrdict.arrdict(**state, decision=decision)), n_agents,
+                    dpi=config['DISPLAY']['dpi'])
             if steps == length:
                 break
 

@@ -155,9 +155,11 @@ class SearchAndRescueBase:
             bounds=self._bounds[e].clone())
 
     @classmethod
-    def plot_state(cls, state, n_agents):
-
+    def plot_state(cls, state, n_agents, dpi=None):
         fig = plt.figure()
+        if dpi is not None:
+            fig.set_dpi(dpi)
+
         gs = plt.GridSpec(max(2, n_agents), 2, fig)
 
         colors = [f'C{i}' for i in range(n_agents)]
@@ -192,5 +194,5 @@ class SearchAndRescueBase:
 
         return fig
 
-    def display(self, d=0, n_agents=None):
-        return self.plot_state(arrdict.numpyify(self.state(d)), n_agents or self.core.n_agents)
+    def display(self, d=0, n_agents=None, dpi=None):
+        return self.plot_state(arrdict.numpyify(self.state(d)), n_agents or self.core.n_agents, dpi)
