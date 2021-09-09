@@ -133,7 +133,8 @@ class SearchAndRescueBase:
 
         self._lengths += 1
 
-        reset = (self._lengths >= self._potential + 200) | (self._battery.get_battery_level() <= 0)
+        reset = (self._lengths >= self._potential + 200) | \
+                (self._battery.get_battery_level() <= 0)[:, :self.n_controllable_agents]
         self._reset(reset)
         obs, reward = self._observe(reset)
         return arrdict.arrdict(
