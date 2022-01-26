@@ -1,12 +1,25 @@
-seed: 120
+seed: 13
 
 ENV:
-    n_envs: 2
-    n_agents: 3
-    n_search_objects: 4
+  ## SETUP
+  n_envs: 2
+  n_agents: 3
+  n_search_objects: 4
 
-    res: 256
-    fov: 179
-    subsample: 1
+  # --perception
+  res: 256
+  fov: 179
+  subsample: 1
 
-    time_to_detect: 10
+  ## --battery discharge
+  scale_factor: 0.01
+  lin_ang_factor: 0.9
+  const_motion_discharge: 0.1,
+  const_non_motion_discharge: 0.02
+
+  ## REWARD
+
+  time_to_detect: 10
+
+DISPLAY:
+  dpi: 150
