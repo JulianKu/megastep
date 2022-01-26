@@ -22,6 +22,7 @@ class SearchAndRescueBase:
         self.n_controllable_agents = n_agents
         self.n_search_objects = n_search_objects
         self.n_all_entities = n_all_entities
+        self.n_envs = n_envs
         self._mover = modules.MomentumMovementOnOff(self.core, n_agents=n_agents)
         max_vel = self._mover.get_maximum_velocities()
         self._battery = modules.BatteryLevel(self.core, n_agents=n_agents, velocity_scales=max_vel, **kwargs)
@@ -90,6 +91,7 @@ class SearchAndRescueBase:
         new_found_objects = self._tracked_search_objects >= self._time_to_detect
         self._found_search_objects |= new_found_objects
 
+        # TODO: add reward for battery, finding search object, collision etc.
         reward = (potential - self._potential) / self.core.res
         self._potential = potential
 
@@ -116,6 +118,7 @@ class SearchAndRescueBase:
         self._seen[controllable_agt_reset[self._tex_to_env][:, 0]] = False
         self._potential[controllable_agt_reset] = 0
         self._lengths[controllable_agt_reset] = 0
+        self._found_search_objects[controllable_agt_reset] = False
 
     @torch.no_grad()
     def reset(self):
@@ -134,7 +137,8 @@ class SearchAndRescueBase:
         self._lengths += 1
 
         reset = (self._lengths >= self._potential + 200) | \
-                (self._battery.get_battery_level() <= 0)[:, :self.n_controllable_agents]
+                (self._battery.get_battery_level() <= 0)[:, :self.n_controllable_agents] | \
+                (self._found_search_objects.all(-1))
         self._reset(reset)
         obs, reward = self._observe(reset)
         return arrdict.arrdict(
