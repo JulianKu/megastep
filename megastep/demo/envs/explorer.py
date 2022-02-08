@@ -117,7 +117,7 @@ class Explorer:
         alpha = .1 + .9 * state.seen.astype(float)
         # modifying this in place will bite me eventually. o for a lens
         state.core.scenery.textures.vals = np.concatenate([state.core.scenery.textures.vals, alpha[:, None]], 1)
-        ax = core.Core.plot_state(state.core, plt.subplot(gs[:, 0]))
+        ax = core.Core.plot_state(state.core, 1, plt.subplot(gs[:, 0]))
 
         images = {'rgb': state.rgb, 'd': state.d}
         plotting.plot_images(images, [plt.subplot(gs[:, 1])])

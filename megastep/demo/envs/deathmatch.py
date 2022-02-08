@@ -128,7 +128,7 @@ class Deathmatch:
 
         colors = [f'C{i}' for i in range(n_agents)]
 
-        plan = core.Core.plot_state(state.core, plt.subplot(gs[:-1, :-1]))
+        plan = core.Core.plot_state(state.core, n_agents, plt.subplot(gs[:-1, :-1]))
 
         # Add hits
         origin, dest = state.matchings.nonzero()
